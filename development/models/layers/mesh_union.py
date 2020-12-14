@@ -49,7 +49,7 @@ class MeshUnion:
     def get_sparse_groups(self):
         self.sparseGroups = self.sparseGroups.coalesce()
         self.sparseGroups.values().clamp_(0, 1)
-        return self.sparseGroups
+        return self.sparseGroups.clone()
 
     def rebuild_features_average(self, features, mask, target_edges):
         self.prepare_groups(features, mask)
@@ -60,15 +60,10 @@ class MeshUnion:
 
         sparseFe = torch.sparse.mm(self.sparseGroups.transpose(1, 0), features.squeeze(-1).transpose(1, 0))[tensor_mask,:].transpose_(1, 0)
 
-        #assert torch.allclose(sparseFe, fe), "Tensors are not equal"
-
         occurrences = torch.sum(self.groups, 0).expand(fe.shape)
         fe = fe / occurrences
 
         sparseOccurrences = torch.sparse.sum(self.sparseGroups,0).to_dense()[tensor_mask].expand(sparseFe.shape) # could we broadcast instead of expand??
-
-        #assert torch.allclose(occurrences,sparseOccurrences), "Occurrences not equal"
-
         sparseFe = sparseFe / sparseOccurrences
 
         padding_b = target_edges - fe.shape[1]
@@ -90,13 +85,6 @@ class MeshUnion:
 
         self.sparseGroups = self.sparseGroups.coalesce()
         self.sparseGroups.values().clamp_(0, 1)
-        # sp = self.sparseGroups.to_dense()
-        #
-        # if (not torch.allclose(self.groups,sp )):
-        #     diffIndices = torch.nonzero(torch.abs(torch.sub(self.groups,sp)) > 0.00001)
-        #     print(len(diffIndices), "diffs of", sp.shape[0]*sp.shape[1])
-        #     assert False, "Tensors are not equal"
-        #assert torch.allclose(self.groups[tensor_mask,:],self.sparseGroups.to_dense()[tensor_mask,:]), "Error"
 
         self.groups = torch.clamp(self.groups[tensor_mask, :], 0, 1).transpose_(1, 0)
         self.sparseGroups = self.sparseGroups.transpose_(1, 0) # Do masking later, on multiplication.
@@ -106,4 +94,3 @@ class MeshUnion:
             padding_a = ConstantPad2d((0, 0, 0, padding_a), 0)
             self.groups = padding_a(self.groups)
             self.sparseGroups.sparse_resize_((padded_n,self.sparseGroups.shape[1]),2,0)
-            #assert torch.allclose(self.groups, self.sparseGroups.to_dense()[:,tensor_mask]), "Error"

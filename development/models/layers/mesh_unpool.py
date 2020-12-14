@@ -24,7 +24,7 @@ class MeshUnpool(nn.Module):
         padding_rows =  self.unroll_target - start
         padding_cols = self.unroll_target - end
         if padding_rows != 0 or padding_cols !=0:
-            group.sparse_resize_((self.unroll_target, self.unroll_target), 2, 0)
+            group = group.sparse_resize_((self.unroll_target, self.unroll_target), 2, 0)
         return group
 
     def pad_occurrences(self, occurrences):
@@ -41,10 +41,15 @@ class MeshUnpool(nn.Module):
             mask = padding(mask)
         return mask
 
+    def get_src_mask(self,mask, unroll_start):
+        src_mask = torch.full((1,unroll_start),True)
+        src_mask[:,torch.sum(mask == True):] = False
+        return src_mask.unsqueeze(0)
+
     def forward(self, features, meshes):
         batch_size, nf, edges = features.shape
-        groups = [self.pad_groups(mesh.get_groups(), edges) for mesh in meshes]
-        unroll_mat = torch.cat(groups, dim=0).view(batch_size, edges, -1)
+        padded_groups = [self.pad_groups(mesh.get_groups(), edges) for mesh in meshes]
+        unroll_mat = torch.cat(padded_groups, dim=0).view(batch_size, edges, -1)
 
         sparse_groups = [self.pad_sparse_groups(mesh.get_sparse_groups()) for mesh in meshes]
         sparse_unroll_mat = torch.stack(sparse_groups)
@@ -60,19 +65,27 @@ class MeshUnpool(nn.Module):
         #sparse_unroll_mat = sparse_unroll_mat / sparse_ocurrences
         sparse_unroll_mat = sparse_unroll_mat.to(features.device)
 
+        masks = [mesh.get_group_mask() for mesh in meshes]
+        dst_masks = torch.cat([self.pad_mask(mask) for mask in masks], dim=0).view(batch_size, 1,self.unroll_target).expand(-1, nf,-1)
+        src_masks = torch.cat([self.get_src_mask(mask, edges) for mask in masks], dim=0).view(batch_size, 1, edges).expand(-1, nf, -1)
+
+        padded_features = torch.zeros((batch_size, nf, self.unroll_target), device=features.device)
+        padded_features[dst_masks] = features[src_masks]
+
         for mesh in meshes:
             mesh.unroll_gemm()
 
         res = torch.matmul(features, unroll_mat)
 
-        masks = torch.cat([self.pad_mask(mesh.get_group_mask()) for mesh in meshes],dim=0).view(batch_size,1,self.unroll_target).expand(-1,nf,-1).transpose(2,1)
-        padded_features = torch.zeros((batch_size,self.unroll_target,nf),device=features.device)
-        test = padded_features[masks]
-        padded_features[masks] = features.transpose(2,1).reshape(-1)
 
-        sparseRes = torch.sparse.mm(sparse_unroll_mat.transpose(1,0), padded_features).transpose(1, 0)
+        sparseRes = torch.bmm(sparse_unroll_mat.transpose(2,1), padded_features.transpose(2,1)).transpose(2, 1)
         sparseRes = sparseRes / occurrences.expand(sparseRes.shape)
 
-        return res
+        assert torch.allclose(sparseRes,res,rtol=1e-03, atol=1e-06), "Error"
+        # diffIndices = torch.nonzero(torch.abs(torch.sub(sparseRes, res)) > 0.00001)
+        # if (len(diffIndices) > 0):
+        #     print(len(diffIndices), "diffs of", res.shape[0]*res.shape[1]*res.shape[2])
+            #assert False, "Tensors are not equal"
+        return sparseRes
 
 
