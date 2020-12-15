@@ -9,7 +9,7 @@ class MeshUnion:
         self.groups = torch.eye(n, device=device)
 
         indicesDim = torch.arange(0, n, device=device).unsqueeze(0)
-        indices = torch.cat((indicesDim, torch.clone(indicesDim)))
+        indices = torch.cat((indicesDim, indicesDim.clone()))
         values = torch.ones(n, device=device)
         self.sparseGroups = torch.sparse_coo_tensor(indices, values, (n, n), device=device)
 
@@ -21,12 +21,10 @@ class MeshUnion:
 
         self.sparseGroups = self.sparseGroups.coalesce()
         sparseRow = self.sparseGroups[source].coalesce()
-        rowIdcs = torch.clone(sparseRow.indices())
-        rowValues = torch.clone(sparseRow.values())
+        rowIdcs = sparseRow.indices()
         allIdcs = torch.cat(((torch.ones(rowIdcs.shape[1], dtype=torch.long, device = self.device) * target).unsqueeze(0), rowIdcs))
-        tmpSparseTensor = torch.sparse_coo_tensor(allIdcs,rowValues,self.sparseGroups.shape)
+        tmpSparseTensor = torch.sparse_coo_tensor(allIdcs,sparseRow.values(),self.sparseGroups.shape)
         self.sparseGroups.add_(tmpSparseTensor)
-        self.sparseGroups = self.sparseGroups.coalesce()
 
     def remove_group(self, index):
         return
@@ -42,8 +40,6 @@ class MeshUnion:
 
     def get_groups(self, tensor_mask):
         self.groups = torch.clamp(self.groups, 0, 1)
-        self.sparseGroups = self.sparseGroups.coalesce()
-        self.sparseGroups.values().clamp_(0,1)
         return self.groups[tensor_mask, :]
 
     def get_sparse_groups(self):
@@ -56,15 +52,14 @@ class MeshUnion:
         fe = torch.matmul(features.squeeze(-1), self.groups)
 
         tensor_mask = torch.from_numpy(mask)
-        self.sparseGroups = self.sparseGroups.coalesce()  # really needed?
 
-        sparseFe = torch.sparse.mm(self.sparseGroups.transpose(1, 0), features.squeeze(-1).transpose(1, 0))[tensor_mask,:].transpose_(1, 0)
+        sparseFe = torch.sparse.mm(self.sparseGroups, features.squeeze(-1).transpose(1, 0))[tensor_mask,:].transpose_(1, 0)
 
         occurrences = torch.sum(self.groups, 0).expand(fe.shape)
         fe = fe / occurrences
 
-        sparseOccurrences = torch.sparse.sum(self.sparseGroups,0).to_dense()[tensor_mask].expand(sparseFe.shape) # could we broadcast instead of expand??
-        sparseFe = sparseFe / sparseOccurrences
+        sparseOccurrences = torch.sparse.sum(self.sparseGroups,1).to_dense()[tensor_mask]
+        sparseFe = sparseFe / sparseOccurrences # could we broadcast instead of expand??
 
         padding_b = target_edges - fe.shape[1]
         if padding_b > 0:
@@ -83,14 +78,12 @@ class MeshUnion:
 
         tensor_mask = torch.from_numpy(mask)
 
-        self.sparseGroups = self.sparseGroups.coalesce()
         self.sparseGroups.values().clamp_(0, 1)
 
         self.groups = torch.clamp(self.groups[tensor_mask, :], 0, 1).transpose_(1, 0)
-        self.sparseGroups = self.sparseGroups.transpose_(1, 0) # Do masking later, on multiplication.
 
         padding_a = features.shape[1] - self.groups.shape[0]
         if padding_a > 0:
             padding_a = ConstantPad2d((0, 0, 0, padding_a), 0)
             self.groups = padding_a(self.groups)
-            self.sparseGroups.sparse_resize_((padded_n,self.sparseGroups.shape[1]),2,0)
+            self.sparseGroups.sparse_resize_((self.sparseGroups.shape[0],padded_n),2,0)

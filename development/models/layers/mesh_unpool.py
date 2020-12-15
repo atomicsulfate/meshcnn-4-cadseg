@@ -62,15 +62,15 @@ class MeshUnpool(nn.Module):
         unroll_mat = unroll_mat / dense_occurrences
         unroll_mat = unroll_mat.to(features.device)
 
-        #sparse_unroll_mat = sparse_unroll_mat / sparse_ocurrences
         sparse_unroll_mat = sparse_unroll_mat.to(features.device)
 
         masks = [mesh.get_group_mask() for mesh in meshes]
-        dst_masks = torch.cat([self.pad_mask(mask) for mask in masks], dim=0).view(batch_size, 1,self.unroll_target).expand(-1, nf,-1)
-        src_masks = torch.cat([self.get_src_mask(mask, edges) for mask in masks], dim=0).view(batch_size, 1, edges).expand(-1, nf, -1)
 
-        padded_features = torch.zeros((batch_size, nf, self.unroll_target), device=features.device)
-        padded_features[dst_masks] = features[src_masks]
+        dst_masks = torch.cat([self.pad_mask(mask) for mask in masks], dim=0).view(batch_size, self.unroll_target)
+        src_masks = torch.cat([self.get_src_mask(mask, edges) for mask in masks], dim=0).view(batch_size, edges)
+
+        padded_features = torch.zeros((batch_size, self.unroll_target, nf), device=features.device)
+        padded_features[dst_masks] = features.transpose(2,1)[src_masks]
 
         for mesh in meshes:
             mesh.unroll_gemm()
@@ -78,7 +78,7 @@ class MeshUnpool(nn.Module):
         res = torch.matmul(features, unroll_mat)
 
 
-        sparseRes = torch.bmm(sparse_unroll_mat.transpose(2,1), padded_features.transpose(2,1)).transpose(2, 1)
+        sparseRes = torch.bmm(sparse_unroll_mat.transpose(2,1), padded_features).transpose(2, 1)
         sparseRes = sparseRes / occurrences.expand(sparseRes.shape)
 
         assert torch.allclose(sparseRes,res,rtol=1e-03, atol=1e-06), "Error"
