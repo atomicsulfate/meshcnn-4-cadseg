@@ -10,16 +10,7 @@ class MeshUnpool(nn.Module):
     def __call__(self, features, meshes):
         return self.forward(features, meshes)
 
-    def pad_groups(self, group, unroll_start):
-        start, end = group.shape
-        padding_rows =  unroll_start - start
-        padding_cols = self.unroll_target - end
-        if padding_rows != 0 or padding_cols !=0:
-            padding = nn.ConstantPad2d((0, padding_cols, 0, padding_rows), 0)
-            group = padding(group)
-        return group
-
-    def pad_sparse_groups(self, group):
+    def pad_groups(self, group):
         start, end = group.shape
         padding_rows =  self.unroll_target - start
         padding_cols = self.unroll_target - end
@@ -48,23 +39,20 @@ class MeshUnpool(nn.Module):
 
     def forward(self, features, meshes):
         batch_size, nf, edges = features.shape
-        padded_groups = [self.pad_groups(mesh.get_groups(), edges) for mesh in meshes]
-        unroll_mat = torch.cat(padded_groups, dim=0).view(batch_size, edges, -1)
 
-        sparse_groups = [self.pad_sparse_groups(mesh.get_sparse_groups()) for mesh in meshes]
-        sparse_unroll_mat = torch.stack(sparse_groups)
+        groups = []
+        masks = []
+        for mesh in meshes:
+            group,mask = mesh.get_groups()
+            groups.append(self.pad_groups(group))
+            masks.append(mask)
+
+        unroll_mat = torch.stack(groups)
 
         occurrences = [self.pad_occurrences(mesh.get_occurrences()) for mesh in meshes]
         occurrences = torch.cat(occurrences, dim=0).view(batch_size, 1, -1)
-        dense_occurrences = occurrences.expand(unroll_mat.shape)
 
-
-        unroll_mat = unroll_mat / dense_occurrences
         unroll_mat = unroll_mat.to(features.device)
-
-        sparse_unroll_mat = sparse_unroll_mat.to(features.device)
-
-        masks = [mesh.get_group_mask() for mesh in meshes]
 
         dst_masks = torch.cat([self.pad_mask(mask) for mask in masks], dim=0).view(batch_size, self.unroll_target)
         src_masks = torch.cat([self.get_src_mask(mask, edges) for mask in masks], dim=0).view(batch_size, edges)
@@ -75,17 +63,9 @@ class MeshUnpool(nn.Module):
         for mesh in meshes:
             mesh.unroll_gemm()
 
-        res = torch.matmul(features, unroll_mat)
+        res = torch.bmm(unroll_mat.transpose(2,1), padded_features).transpose(2, 1)
+        res = res / occurrences
 
-
-        sparseRes = torch.bmm(sparse_unroll_mat.transpose(2,1), padded_features).transpose(2, 1)
-        sparseRes = sparseRes / occurrences.expand(sparseRes.shape)
-
-        assert torch.allclose(sparseRes,res,rtol=1e-03, atol=1e-06), "Error"
-        # diffIndices = torch.nonzero(torch.abs(torch.sub(sparseRes, res)) > 0.00001)
-        # if (len(diffIndices) > 0):
-        #     print(len(diffIndices), "diffs of", res.shape[0]*res.shape[1]*res.shape[2])
-            #assert False, "Tensors are not equal"
-        return sparseRes
+        return res
 
 
