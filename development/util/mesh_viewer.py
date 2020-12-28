@@ -6,6 +6,8 @@ import tempfile
 import os
 import sys
 
+# Visualize obj meshes (including segmentation colors if available) using meshplot.
+
 V = np.array
 surface_color = np.array(colors.to_rgb(colors.CSS4_COLORS['lightgrey']))
 edge_colors = ("red","green", "blue","cyan","magenta","yellow","orange","purple","black")
