@@ -1,0 +1,1 @@
+print('MeshCNN layers: Using sparse pooling')
