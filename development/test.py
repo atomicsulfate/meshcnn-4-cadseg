@@ -1,6 +1,6 @@
 from meshcnn.options.test_options import TestOptions
 from meshcnn.data import DataLoader
-from meshcnn.models import create_model
+from models import create_model
 from meshcnn.util.writer import Writer
 
 
@@ -9,7 +9,7 @@ def run_test(epoch=-1):
     opt = TestOptions().parse()
     opt.serial_batches = True  # no shuffle
     dataset = DataLoader(opt)
-    model = create_model(opt)
+    model = create_model(opt, 0)
     writer = Writer(opt)
     # test
     writer.reset_counter()

@@ -4,17 +4,28 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__),"meshcnn"
 
 from meshcnn.options.train_options import TrainOptions
 from meshcnn.data import DataLoader
-from meshcnn.models import create_model
+from models import create_model
 from meshcnn.util.writer import Writer
-from meshcnn.test import run_test
+from test import run_test
 
-if __name__ == '__main__':
-    opt = TrainOptions().parse()
+import torch.distributed as dist
+import torch.multiprocessing as mp
+
+def setup(rank, numGPUs):
+    os.environ['MASTER_ADDR'] = 'localhost'
+    os.environ['MASTER_PORT'] = '12355'
+
+    # initialize the process group
+    dist.init_process_group("nccl", rank=rank, world_size=numGPUs)
+
+def train(rank, numGPUs, opt):
+    setup(rank, numGPUs)
+
     dataset = DataLoader(opt)
     dataset_size = len(dataset)
     print('#training meshes = %d' % dataset_size)
 
-    model = create_model(opt)
+    model = create_model(opt, rank)
     writer = Writer(opt)
     total_steps = 0
 
@@ -44,7 +55,7 @@ if __name__ == '__main__':
                 model.save_network('latest')
 
             iter_data_time = time.time()
-        if epoch % opt.save_epoch_freq == 0:
+        if rank == 0 and epoch % opt.save_epoch_freq == 0:
             print('saving the model at the end of epoch %d, iters %d' %
                   (epoch, total_steps))
             model.save_network('latest')
@@ -61,3 +72,9 @@ if __name__ == '__main__':
             writer.plot_acc(acc, epoch)
 
     writer.close()
+    dist.destroy_process_group()
+
+if __name__ == '__main__':
+    opt = TrainOptions().parse()
+    numGPUs = len(opt.gpu_ids)
+    mp.spawn(train, args=(numGPUs,opt), nprocs=numGPUs, join=True)
