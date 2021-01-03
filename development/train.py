@@ -68,9 +68,11 @@ def train(rank, numGPUs, opt):
             writer.plot_model_wts(model, epoch)
 
         if epoch % opt.run_test_freq == 0:
-            acc = run_test(epoch)
-            writer.plot_acc(acc, epoch)
-
+            if rank == 0:
+                acc = run_test(epoch)
+                writer.plot_acc(acc, epoch)
+            else:
+                dist.barrier()
     writer.close()
     dist.destroy_process_group()
 

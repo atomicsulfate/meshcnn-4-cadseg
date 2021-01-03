@@ -7,11 +7,12 @@ from torch.nn.parallel import DistributedDataParallel
 
 class DistributedClassifierModel(ClassifierModel):
     def __init__(self, opt, rank):
-        print('Using distributed classifier model')
-
         self.rank = rank
         self.opt = opt
         self.gpu_id = opt.gpu_ids[rank]
+
+        print('Using distributed classifier model, GPU {}'.format(self.gpu_id))
+
         self.is_train = opt.is_train
         self.device = torch.device('cuda:{}'.format(self.gpu_id))
         self.save_dir = join(opt.checkpoints_dir, opt.name)
@@ -40,6 +41,12 @@ class DistributedClassifierModel(ClassifierModel):
         if not self.is_train or opt.continue_train:
             self.load_network(opt.which_epoch)
 
+    def forward(self):
+        if self.is_train:
+            return self.net(self.edge_features, self.mesh)
+        else:
+            # Do not use distributed model for test/validation.
+            return self.net.module(self.edge_features, self.mesh)
 
     def load_network(self, which_epoch):
         """load model from disk"""
@@ -64,4 +71,3 @@ class DistributedClassifierModel(ClassifierModel):
         save_filename = '%s_net.pth' % (which_epoch)
         save_path = join(self.save_dir, save_filename)
         torch.save(self.net.state_dict(), save_path)
-
