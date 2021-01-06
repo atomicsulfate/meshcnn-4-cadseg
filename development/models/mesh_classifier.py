@@ -13,7 +13,6 @@ class DistributedClassifierModel(ClassifierModel):
 
         print('Using distributed classifier model, GPU {}'.format(self.gpu_id))
 
-        self.is_train = opt.is_train
         self.device = torch.device('cuda:{}'.format(self.gpu_id))
         self.save_dir = join(opt.checkpoints_dir, opt.name)
         self.optimizer = None
@@ -29,8 +28,8 @@ class DistributedClassifierModel(ClassifierModel):
         # load/define networks
         self.net = networks.define_classifier(opt.input_nc, opt.ncf, opt.ninput_edges, opt.nclasses, opt,
                                               [self.gpu_id], opt.arch, opt.init_type, opt.init_gain)
-        self.net.train(self.is_train)
         self.net = DistributedDataParallel(self.net, device_ids=[self.gpu_id])
+        self.set_train(opt.is_train)
         self.criterion = networks.define_loss(opt).to(self.device)
 
         if self.is_train:
@@ -40,6 +39,10 @@ class DistributedClassifierModel(ClassifierModel):
 
         if not self.is_train or opt.continue_train:
             self.load_network(opt.which_epoch)
+
+    def set_train(self, train):
+        self.is_train = train
+        self.net.train(self.is_train)
 
     def forward(self):
         if self.is_train:

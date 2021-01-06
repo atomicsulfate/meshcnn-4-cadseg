@@ -3,10 +3,10 @@ import time,sys,os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__),"meshcnn")))
 
 from meshcnn.options.train_options import TrainOptions
-from meshcnn.data import DataLoader
+from data import DistributedDataLoader
 from models import create_model
 from meshcnn.util.writer import Writer
-from test import run_test
+from test import run_validation
 
 import torch.distributed as dist
 import torch.multiprocessing as mp
@@ -21,7 +21,7 @@ def setup(rank, numGPUs):
 def train(rank, numGPUs, opt):
     setup(rank, numGPUs)
 
-    dataset = DataLoader(opt)
+    dataset = DistributedDataLoader(opt, numGPUs, rank)
     dataset_size = len(dataset)
     print('#training meshes = %d' % dataset_size)
 
@@ -33,6 +33,7 @@ def train(rank, numGPUs, opt):
         epoch_start_time = time.time()
         iter_data_time = time.time()
         epoch_iter = 0
+        dataset.set_epoch(epoch)
 
         for i, data in enumerate(dataset):
             iter_start_time = time.time()
@@ -49,7 +50,7 @@ def train(rank, numGPUs, opt):
                 writer.print_current_losses(epoch, epoch_iter, loss, t, t_data)
                 writer.plot_loss(loss, epoch, epoch_iter, dataset_size)
 
-            if i % opt.save_latest_freq == 0:
+            if rank == 0 and i % opt.save_latest_freq == 0:
                 print('saving the latest model (epoch %d, total_steps %d)' %
                       (epoch, total_steps))
                 model.save_network('latest')
@@ -69,10 +70,10 @@ def train(rank, numGPUs, opt):
 
         if epoch % opt.run_test_freq == 0:
             if rank == 0:
-                acc = run_test(epoch)
+                acc = run_validation(model, epoch)
                 writer.plot_acc(acc, epoch)
-            else:
-                dist.barrier()
+            dist.barrier()
+
     writer.close()
     dist.destroy_process_group()
 
