@@ -4,7 +4,7 @@ import meshplot as mp
 import webbrowser
 import tempfile
 import os
-import sys
+import pythreejs as p3s
 
 # Visualize obj meshes (including segmentation colors if available) using meshplot.
 
@@ -66,13 +66,15 @@ def parse_obje(obj_file, scale_by):
 def view_meshes(files, outPath):
 
     tmpDir = None
+    autoOpen = False
     if (len(outPath) == 0):
         outPath = tempfile.mkdtemp()
+        autoOpen = True
 
     mp.website()
-    shading = {"width": 1600,
-               "height": 900,
-               "colormap": "caca"}
+    shading = {"width": 1024,
+               "height": 768,
+               "background": "#fffdd1"}
 
 
     p = None
@@ -98,8 +100,15 @@ def view_meshes(files, outPath):
         # mesh[0][:, 0] += max_x + offset
         # plot = plot_mesh(mesh, surfaces, segments, plot=plot, show=file == files[-1])
         # max_x += max_x_current + offset
+
+        # tt = p3s.TextTexture(string="Sphere", color="red")
+        # sm = p3s.SpriteMaterial(map=tt)
+        # text = p3s.Sprite(material=sm)
+        # p._scene.add(text)
+
         p.save(outFile)
-        webbrowser.open(outFile)
+        if (autoOpen):
+            webbrowser.open(outFile)
 
 if __name__=='__main__':
     import argparse
