@@ -74,3 +74,21 @@ class DistributedClassifierModel(ClassifierModel):
         save_filename = '%s_net.pth' % (which_epoch)
         save_path = join(self.save_dir, save_filename)
         torch.save(self.net.state_dict(), save_path)
+
+    def test(self):
+        """tests model
+        returns: number correct and total number
+        """
+        with torch.no_grad():
+            out = self.forward()
+            # compute number of correct
+            pred_class = out.data.max(1)[1]
+            label_class = self.labels
+            self.export_segmentation(pred_class.cpu(), label_class)
+            correct = self.get_accuracy(pred_class, label_class)
+        return correct, len(label_class)
+
+    def export_segmentation(self, pred_seg, label_seg):
+        if self.opt.dataset_mode == 'segmentation':
+            for meshi, mesh in enumerate(self.mesh):
+                mesh.export_segments(pred_seg[meshi, :], label_seg[meshi,:])
