@@ -32,12 +32,28 @@ section,
 summary {
     display: block
 }
+
+figure {
+  border: 1px #cccccc solid;
+  padding: 0px;
+  margin: 0;
+}
+
+figcaption {
+  background-color: black;
+  color: white;
+  font-style: italic;
+  padding: 2px;
+  text-align: center;
+}
+
 audio,
 canvas,
 progress,
 video {
-    display: inline-block;
+    display: block !important;
     vertical-align: baseline;
+    margin:auto !important;
     border: 4px solid black !important
 }
 audio:not([controls]) {
@@ -94,9 +110,6 @@ img {
 }
 svg:not(:root) {
     overflow: hidden
-}
-figure {
-    margin: 1em 40px
 }
 hr {
     box-sizing: content-box;
@@ -835,6 +848,15 @@ th {
     text-align: left;
     border-bottom: 1px solid #E1E1E1
 }
+.surface-types {
+    padding: 0;
+    text-align: center;
+}
+.surface-types-table {
+    color:white;
+    font-weight:bold;
+    text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000
+}
 td:first-child,
 th:first-child {
     padding-left: 0
@@ -872,12 +894,20 @@ ul {
     width: 50%;
     box-sizing: border-box
 }
+.u-third-width {
+    width: 30%;
+    box-sizing: border-box
+}
 .u-max-full-width {
     max-width: 100%;
     box-sizing: border-box
 }
 .u-pull-right {
     float: right
+}
+.u-pull-right-third {
+    float: right;
+    width: 30%
 }
 .u-pull-left {
     float: left
