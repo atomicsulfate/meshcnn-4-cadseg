@@ -109,6 +109,18 @@
             </figure>
         </div>
         <h4 class="subsection-heading">ABC Dataset</h4>
+        <div class="u-pull-right" style="width:30%">
+            <figure>
+                <img class="u-max-full-width" src="images/abcmodel.png">
+                <figcaption>ABC dataset model</figcaption>
+            </figure>
+        </div>
+        <ul>
+            <li>1M CAD models</li>
+            <li>Explicitely parameterized surfaces/curves</li>
+            <li>High-quality triangle meshes</li>
+        </ul>
+        <div style="clear:both;display: block"/>
     </div>
 
     <div class="docs-section" id="method">
@@ -116,19 +128,30 @@
         <p class="section-description"></p>
         <h4 class="subsection-heading">MeshCNN improvements</h4>
         <p>Initial experiments showed that MeshCNN is not optimized to handle large meshes. The experiments in the
-           original paper use datasets with small meshes, having at most a few thousand edges.<br>
+           original paper use datasets with small meshes, having at most a few thousand edges.<br><br>
            The first bottleneck is GPU memory usage, which grows quadratically with the number of mesh edges. Each pooling
-            layer keeps in memory a tensor of edges^2 elements mapping edge collapses (<i>MeshUnion</i> class). This makes impossible training with half
-            of the meshes in the ABC dataset (a single pooling operation in a 50K-edge mesh would allocate ~18GB of memory just for edge collapse bookkeeping!).
-            The tensor though is inherently sparse, therefore we reimplemented the <i>MeshUnion</i> class and the <i>MeshUnpool</i> using <i>torch.sparse_coo_tensor</i>
-            and sparse operations such as <i>torch.sparse.mm</i> and <i>torch.sparse.sum</i>. The memory consumption at function <i>create_GeMM</i> in
-            the <i>MeshConv</i> layer was also reduced to less than a half by deleting temporary tensors once they're not needed and rewriting the symmetric
-            functions so that they are done in place.<br>
+            layer keeps in memory a tensor of \(edges^{2}\) elements mapping edge collapses (<a href="https://github.com/ranahanocka/MeshCNN/blob/15b83cc6a4db968baf6cf595df78995a9c2dcee3/models/layers/mesh_union.py#L5"><i>MeshUnion</i></a> class).
+            This makes impossible training with half of the meshes in the ABC dataset (a single pooling operation in a 50K-edge mesh would allocate ~18GB of memory just for edge collapse bookkeeping!).<br>
+            \[
+            U = \begin{bmatrix}
+                u_{11} & u_{12} & \dots \\
+                \vdots & \ddots & \\
+                u_{N1} &        & u_{NM}
+                \end{bmatrix} \begin{cases}
+              M = \text{#input edges}\\
+              N = \text{#output edges}\\
+              u_{ij} = \text{# collapses of input edge i into output edge j}
+            \end{cases}
+            \],<br>
+            The tensor though is inherently sparse, therefore we reimplemented <i>MeshUnion</i> and <a href="https://github.com/ranahanocka/MeshCNN/blob/15b83cc6a4db968baf6cf595df78995a9c2dcee3/models/layers/mesh_unpool.py#L6"><i>MeshUnpool</i></a> classes using <a href="https://pytorch.org/docs/stable/generated/torch.sparse_coo_tensor.html"><i>torch.sparse_coo_tensor</i></a>
+            and sparse operations such as  <a href="https://pytorch.org/docs/stable/sparse.html#torch.sparse.mm"><i>torch.sparse.mm</i></a> and <a href="https://pytorch.org/docs/stable/sparse.html#torch.sparse.mm"><i>torch.sparse.sum</i></a>.
+            The memory consumption at function <a href="https://github.com/ranahanocka/MeshCNN/blob/15b83cc6a4db968baf6cf595df78995a9c2dcee3/models/layers/mesh_conv.py#L39"><i>create_GeMM</i></a> in the <a href="https://github.com/ranahanocka/MeshCNN/blob/15b83cc6a4db968baf6cf595df78995a9c2dcee3/models/layers/mesh_conv.py#L5"><i>MeshConv</i></a>
+            layer was also reduced to less than a half by deleting temporary tensors once they're not needed and rewriting the symmetric functions so that they are done in place.<br><br>
             Another important bottleneck is that the edge collapsing at the MeshPool layer is done sequentially in CPU. As a result, MeshCNN training is
             CPU-bound and GPU utilization is low (under 30% in a NVIDIA Tesla P100). Training times become impractical for small datasets
             (9h per epoch for 1K meshes of 35K edges). To alleviate this problem, we modified MeshCNN code to allow for distributed training across multiple CPUs or
-            even nodes. Using <i>torch.nn.parallel.DistributedDataParallel</i>, each batch is split and processed by identical instances of the model in separate devices,
-            averaging the gradients for each node during the backwards pass.<br>
+            even nodes. Using <a href="https://pytorch.org/docs/stable/generated/torch.nn.parallel.DistributedDataParallel.html"><i>torch.nn.parallel.DistributedDataParallel</i></a>, each batch
+            is split and processed by identical instances of the model in separate devices, averaging the gradients for each node during the backwards pass.<br><br>
             Thanks to these optimizations we could train MeshCNN with ABC models of average size (~35K edges) and typical batch sizes (~10), having still room to increase
             the number of pooling layers.<br>
         </p>
