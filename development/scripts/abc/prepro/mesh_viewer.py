@@ -49,7 +49,7 @@ def parse_obje(obj_file, scale_by):
             elif splitted_line[0] == 'v':
                 vs.append([float(v) for v in splitted_line[1:]])
             elif splitted_line[0] == 'f':
-                faces.append([int(c) - 1 for c in splitted_line[1:]])
+                faces.append([int(c.split("//")[0]) - 1 for c in splitted_line[1:]])
             elif splitted_line[0] == 'e':
                 if len(splitted_line) >= 4:
                     edge_v = [int(c) - 1 for c in splitted_line[1:-1]]
@@ -101,9 +101,11 @@ def view_meshes(files, outPath):
         # plot = plot_mesh(mesh, surfaces, segments, plot=plot, show=file == files[-1])
         # max_x += max_x_current + offset
 
-        # tt = p3s.TextTexture(string="Sphere", color="red")
+        # tt = p3s.TextTexture(string="Plane", color="red", size="60")
         # sm = p3s.SpriteMaterial(map=tt)
         # text = p3s.Sprite(material=sm)
+        # text.scale = [0.5,0.5,1]
+        # text.center = [1.0,1.0]
         # p._scene.add(text)
 
         p.save(outFile)

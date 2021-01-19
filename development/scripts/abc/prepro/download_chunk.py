@@ -3,7 +3,7 @@ import os, sys
 
 datasetRoot = "datasets/abc";
 
-def downloadChunk(chunk):
+def downloadChunk(chunk, chunkType):
     typeRoot = os.path.join(datasetRoot, chunkType)
     url, filename = chunk.split()
     dstPath = os.path.join(typeRoot,filename)
@@ -15,24 +15,28 @@ def downloadChunk(chunk):
     os.system("7z x {} -o{}".format(dstPath, typeRoot))
     os.system("rm {}".format(dstPath))
 
+def downloadChunkType(chunkType, chunkIndex):
+    indexFileName = chunkType + "_v00.txt"
+    path = os.path.join(datasetRoot,indexFileName)
+    file = open(path, "r")
+    chunks = file.readlines()
+
+    if( chunkIndex == None):
+        for chunk in chunks:
+            downloadChunk(chunk, chunkType)
+    else:
+        downloadChunk(chunks[chunkIndex], chunkType)
 
 chunkIndex = None
 
-if len(sys.argv) < 2 or len(sys.argv) > 3:
+if len(sys.argv) > 2:
     print("Wrong parameters")
     exit(1)
-elif len(sys.argv) == 3:
+elif len(sys.argv) == 2:
     chunkIndex = int(sys.argv[-1])
 
-chunkType = sys.argv[-len(sys.argv)+1]
+#downloadChunkType("stat", chunkIndex)
+downloadChunkType("feat", chunkIndex)
+downloadChunkType("obj", chunkIndex)
 
-indexFileName = chunkType + "_v00.txt"
-path = os.path.join(datasetRoot,indexFileName)
-file = open(path, "r")
-chunks = file.readlines()
 
-if( chunkIndex == None):
-    for chunk in chunks:
-        downloadChunk(chunk)
-else:
-    downloadChunk(chunks[chunkIndex])

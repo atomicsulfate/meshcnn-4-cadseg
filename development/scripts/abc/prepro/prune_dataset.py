@@ -30,7 +30,7 @@ def addMesh(srcPath, dstPath):
     os.symlink(os.path.abspath(srcPath),os.path.join(dstPath,os.path.basename(srcPath)))
     return
 
-def findSamples(objPath,maxEdges):
+def findSamples(srcPath,objPath,maxEdges):
     sampleSrcPaths = []
     totalSize = 0
     for root, _, fnames in sorted(os.walk(objPath)):
@@ -58,7 +58,7 @@ def removeLargeSamples():
         print(srcPath, "does not exist")
         exit(1)
 
-    sampleSrcPaths, totalSize = findSamples(objPath, maxEdges)
+    sampleSrcPaths, totalSize = findSamples(srcPath, objPath, maxEdges)
 
     if (len(sampleSrcPaths) > 0):
         logPath = os.path.join(srcPath, "delete_log.txt")
