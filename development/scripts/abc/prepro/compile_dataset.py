@@ -4,6 +4,7 @@ from pathlib import Path
 import argparse
 import math
 import numpy as np
+import random
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__),"../../..")))
 
 from meshcnn.models.layers.mesh_prepare import fill_from_file,remove_non_manifolds, build_gemm
@@ -88,7 +89,7 @@ parser.add_argument('--dst', required=True, type=str, help="Path where the resul
 parser.add_argument('--minEdges', type=int, default=0, help="Min number of edges to add a mesh to the dataset")
 parser.add_argument('--maxEdges', type=int, default=math.inf, help="Max number of edges to add a mesh to the dataset")
 parser.add_argument('--maxSamples', type=int, default=math.inf, help="Max dataset size")
-parser.add_argument('--testTrainRatio', type=float, default=0.1, help="#test samples/#train samples")
+parser.add_argument('--testTrainRatio', type=float, default=0.2, help="#test samples/#train samples")
 parser.add_argument('--excludeNonManifolds', action='store_true', help="Exclude meshes that are not manifolds")
 
 args = parser.parse_args()
@@ -118,6 +119,7 @@ except FileExistsError as f_error:
     exit(1)
 
 sampleSrcPaths = findSamples(objPath,minEdges,maxEdges,maxSamples)
+random.shuffle(sampleSrcPaths)
 
 numTotalSamples = len(sampleSrcPaths)
 numTestSamples = int(numTotalSamples * args.testTrainRatio)

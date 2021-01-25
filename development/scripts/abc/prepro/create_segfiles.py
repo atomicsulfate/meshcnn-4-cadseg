@@ -107,62 +107,64 @@ def getObjLinks(datasetRoot):
                 objLinkPaths.append(os.path.join(root, fname))
     return objLinkPaths
 
-if len(sys.argv) < 2:
-    print("Wrong parameters")
-    exit(1)
+if __name__=='__main__':
 
-datasetRoot = sys.argv[1]
+    if len(sys.argv) < 2:
+        print("Wrong parameters")
+        exit(1)
 
-objLinks = getObjLinks(datasetRoot)
+    datasetRoot = sys.argv[1]
 
-if (len(objLinks) == 0):
-    print("No obj files found in", datasetRoot)
-    exit(1)
+    objLinks = getObjLinks(datasetRoot)
 
-segLinkPath = os.path.join(datasetRoot,"seg")
-ssegLinkPath = os.path.join(datasetRoot,"sseg")
-targetDatasetRoot = getTargetDatasetRoot(objLinks)
-targetSegPath = os.path.join(targetDatasetRoot,"seg")
-targetSSegPath = os.path.join(targetDatasetRoot,"sseg")
+    if (len(objLinks) == 0):
+        print("No obj files found in", datasetRoot)
+        exit(1)
 
-
-print("Creating seg & sseg links in {} (targets in {}) for {} obj files in {}".format(datasetRoot, targetDatasetRoot,
-                                                                                    len(objLinks),datasetRoot))
-
-if (not os.path.exists(targetSegPath)):
-    os.mkdir(targetSegPath)
-
-if (not os.path.exists(targetSSegPath)):
-    os.mkdir(targetSSegPath)
-
-if (not os.path.exists(segLinkPath)):
-    os.symlink(targetSegPath, segLinkPath)
-
-if (not os.path.exists(ssegLinkPath)):
-    os.symlink(targetSSegPath, ssegLinkPath)
+    segLinkPath = os.path.join(datasetRoot,"seg")
+    ssegLinkPath = os.path.join(datasetRoot,"sseg")
+    targetDatasetRoot = getTargetDatasetRoot(objLinks)
+    targetSegPath = os.path.join(targetDatasetRoot,"seg")
+    targetSSegPath = os.path.join(targetDatasetRoot,"sseg")
 
 
-objLinks.sort()
-objFileTargets = list(map(lambda link: os.readlink(link),objLinks))
-featFilePaths = list(map(objPathToFeatPath,objFileTargets))
+    print("Creating seg & sseg links in {} (targets in {}) for {} obj files in {}".format(datasetRoot, targetDatasetRoot,
+                                                                                        len(objLinks),datasetRoot))
 
-for objLink in objLinks:
-    objPath = os.readlink(objLink)
-    fileNamePrefix = os.path.splitext(os.path.basename(objPath))[0]
-    segFilePath = os.path.join(targetSegPath,fileNamePrefix+ segExt)
-    ssegFilePath = os.path.join(targetSSegPath,fileNamePrefix+ ssegExt)
+    if (not os.path.exists(targetSegPath)):
+        os.mkdir(targetSegPath)
 
-    if (os.path.exists(segFilePath) and os.path.exists(ssegFilePath)):
-        continue
+    if (not os.path.exists(targetSSegPath)):
+        os.mkdir(targetSSegPath)
 
-    featFilePath = objPathToFeatPath(objPath)
-    meshData = loadMesh(objPath)
-    createSegFiles(segFilePath, ssegFilePath, featFilePath, meshData)
-    print("{} + {} -> {} -> {} ({} edges)".format(os.path.relpath(objPath,targetDatasetRoot),
-                                            os.path.relpath(featFilePath,targetDatasetRoot),
-                                            os.path.relpath(segFilePath,targetDatasetRoot),
-                                                  os.path.relpath(ssegFilePath, targetDatasetRoot),
-                                                  meshData.edges_count))
+    if (not os.path.exists(segLinkPath)):
+        os.symlink(targetSegPath, segLinkPath)
+
+    if (not os.path.exists(ssegLinkPath)):
+        os.symlink(targetSSegPath, ssegLinkPath)
+
+
+    objLinks.sort()
+    objFileTargets = list(map(lambda link: os.readlink(link),objLinks))
+    featFilePaths = list(map(objPathToFeatPath,objFileTargets))
+
+    for objLink in objLinks:
+        objPath = os.readlink(objLink)
+        fileNamePrefix = os.path.splitext(os.path.basename(objPath))[0]
+        segFilePath = os.path.join(targetSegPath,fileNamePrefix+ segExt)
+        ssegFilePath = os.path.join(targetSSegPath,fileNamePrefix+ ssegExt)
+
+        if (os.path.exists(segFilePath) and os.path.exists(ssegFilePath)):
+            continue
+
+        featFilePath = objPathToFeatPath(objPath)
+        meshData = loadMesh(objPath)
+        createSegFiles(segFilePath, ssegFilePath, featFilePath, meshData)
+        print("{} + {} -> {} -> {} ({} edges)".format(os.path.relpath(objPath,targetDatasetRoot),
+                                                os.path.relpath(featFilePath,targetDatasetRoot),
+                                                os.path.relpath(segFilePath,targetDatasetRoot),
+                                                      os.path.relpath(ssegFilePath, targetDatasetRoot),
+                                                      meshData.edges_count))
 
 
 
