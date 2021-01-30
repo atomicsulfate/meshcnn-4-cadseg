@@ -63,6 +63,9 @@ targetDatasetRoot = getTargetDatasetRoot(objLinks)
 
 print("Computing surface type ratios in {} (targets in {}) for {} obj files".format(datasetRoot, targetDatasetRoot, len(objLinks)))
 
+header = " ".join(x.center(10) for x in surfaceTypes)
+print("\t\t\t\t\t\t    " + header)
+
 objLinks.sort()
 objFileTargets = list(map(lambda link: os.readlink(link),objLinks))
 featFilePaths = list(map(objPathToFeatPath,objFileTargets))
@@ -75,14 +78,15 @@ for objLink in objLinks:
     featFilePath = objPathToFeatPath(objPath)
     surfaceTypeFaceCount = getSurfaceTypeFaceCount(featFilePath)
     totalSurfaceTypeFaceCount += surfaceTypeFaceCount
-    print("{}, {} -> {}".format(os.path.relpath(objPath,targetDatasetRoot),
-                                os.path.relpath(featFilePath,targetDatasetRoot),
-                                surfaceTypeFaceCount))
+    print("{} {}".format(os.path.basename(objPath), " ".join(str(x).center(10) for x in surfaceTypeFaceCount)))
     i += 1
     if (i % 20 == 0):
-        print("Totals after {} samples: {}".format(i, totalSurfaceTypeFaceCount / totalSurfaceTypeFaceCount.sum()))
+        avgSurfaceTypeFaceCount = totalSurfaceTypeFaceCount * 100 / totalSurfaceTypeFaceCount.sum()
+        print("Totals after {} samples:\t\t\t\t{}".format(i, " ".join("{:10.2f}".format(x) for x in avgSurfaceTypeFaceCount)),file=sys.stderr)
 
-print("Totals: {}".format(totalSurfaceTypeFaceCount / totalSurfaceTypeFaceCount.sum()))
+avgSurfaceTypeFaceCount = totalSurfaceTypeFaceCount * 100 / totalSurfaceTypeFaceCount.sum()
+print("\t\t" + header)
+print("Totals: {}".format(" ".join("{:10.4f}".format(x) for x in avgSurfaceTypeFaceCount)))
 
 
 
