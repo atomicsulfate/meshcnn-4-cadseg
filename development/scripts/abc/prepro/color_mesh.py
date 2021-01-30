@@ -9,31 +9,25 @@ import pymesh
 import numpy as np
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__),"../../..")))
-from .create_segfiles import getEdgeHardLabels, objPathToFeatPath
+from scripts.abc.prepro.create_segfiles import getEdgeHardLabels, objPathToFeatPath
 from meshcnn.models.layers.mesh_prepare import fill_from_file,remove_non_manifolds, build_gemm
 
-# def parseYamlFile(path):
-#     data = None
-#     with open(path, 'r') as stream:
-#         try:
-#             data = yaml.safe_load(stream)
-#         except yaml.YAMLError as exc:
-#             print(exc)
-#     return data
 
-# def takeMesh(statPath,minEdges,maxEdges):
-#     for root, _, fnames in sorted(os.walk(statPath)):
-#         for fname in fnames:
-#             if (os.path.splitext(fname)[1] == ".yml"):
-#                 path = os.path.join(root,fname)
-#                 data = parseYamlFile(path)
-#                 faces = data['#faces']
-#                 edges = faces*1.5
-#                 if (edges >=minEdges and edges<=maxEdges):
-#                     print("Adding {} with {} faces and {} edges".format(path,faces,edges))
-#                     return True
-#                 else:
-#                     return False
+def colorMesh(mesh, segLabels, dstPath):
+    faces = mesh.faces
+    new_indices = np.zeros(mesh.v_mask.shape[0], dtype=np.int32)
+    new_indices[mesh.v_mask] = np.arange(0, np.ma.where(mesh.v_mask)[0].shape[0])
+
+    with open(dstPath, 'w') as f:
+        for vi, v in enumerate(mesh.vs):
+            f.write("v %f %f %f\n" % (v[0], v[1], v[2]))
+        for face_id in range(len(faces) - 1):
+            f.write("f %d %d %d\n" % (faces[face_id][0] + 1, faces[face_id][1] + 1, faces[face_id][2] + 1))
+        f.write("f %d %d %d" % (faces[-1][0] + 1, faces[-1][1] + 1, faces[-1][2] + 1))
+        i = 0
+        for edge in mesh.edges:
+            f.write("\ne %d %d %d" % (new_indices[edge[0]] + 1, new_indices[edge[1]] + 1,segLabels[i]))
+            i += 1
 
 def loadMesh(path):
     class MeshData:
@@ -67,17 +61,6 @@ def objPathToSegPath(objPath):
 def loadSegLabels(segPath):
     return np.loadtxt(open(segPath, 'r'), dtype='float64')
 
-def colorMesh(mesh, srcPath, dstPath, segLabels):
-    pmesh = pymesh.load_mesh(srcPath)
-
-    for i in range(mesh.edge_count):
-        edgeLabel = segLabels[i]
-        mesh.edges[i]
-    pmesh = pymesh.subdivide(pmesh, order=1, method="simple")
-    pymesh.save_mesh(dstPath,pmesh)
-    pmesh.vertices
-    return
-
 parser = argparse.ArgumentParser("Color mesh surfaces by type")
 parser.add_argument('--src', required=True, type=str, help="Path to source obj file")
 parser.add_argument('--dst', required=True, type=str, help="Path to new obj file")
@@ -103,20 +86,20 @@ if (os.path.exists(dstPath)):
 
 segPath = objPathToSegPath(srcPath)
 
-if (not os.path.exists(segPath)):
-    print(segPath,"does not exist")
-    exit(1)
-
 mesh = tryLoadMesh(srcPath)
 
 if (mesh == None):
     exit(1)
 
-segLabels = loadSegLabels(segPath)
+segLabels = None
+if (os.path.exists(segPath)):
+    segLabels = loadSegLabels(segPath)
+else:
+    segLabels = getEdgeHardLabels(mesh, objPathToFeatPath(srcPath))
 
-print(getEdgeHardLabels)
 print("Color mesh {} with labels {}, result in {}".format(srcPath,segPath, dstPath))
-colorMesh(mesh,srcPath, dstPath, segLabels)
+colorMesh(mesh,segLabels,dstPath)
+
 
 
 
