@@ -46,13 +46,13 @@ def createMeshWithEdgeCount(minEdges, maxEdges, surfaceFunc, *args, **kwargs):
             return mesh
         mesh_size_factors_inv.append(1.0 / current_mesh_size_factor)
         num_edges.append(numEdges)
+        print("Target edge count missed with factor {}: {} [{},{}]".format(current_mesh_size_factor, numEdges,
+                                                                           minEdges,
+                                                                           maxEdges))
         if (len(mesh_size_factors_inv) < 3):
             current_mesh_size_factor = current_mesh_size_factor / 4
         else:
-            if (len(mesh_size_factors_inv) > 3):
-                print("Target edge count missed with factor {}: {} [{},{}]".format(current_mesh_size_factor, numEdges,
-                                                                                   minEdges,
-                                                                                   maxEdges))
+            #if (len(mesh_size_factors_inv) > 3):
             degree = 2  # if len(mesh_size_factors_inv) < 6 else 1
             polynomial = np.polynomial.Polynomial.fit(mesh_size_factors_inv, num_edges, degree)
             target_edges = round(minEdges + (maxEdges-minEdges)* 0.7)
@@ -66,6 +66,7 @@ def createMeshWithEdgeCount(minEdges, maxEdges, surfaceFunc, *args, **kwargs):
 
 def sample2DOutline():
     min_angle_offset = pi / 10
+    max_angle_offset = 3*pi/4
     point_count = random.uniform(3,10)
     total_angle = random.uniform(pi / 2, 2 * pi)
     points = []
@@ -74,8 +75,8 @@ def sample2DOutline():
     while (len(points) < point_count):
         r = random.random()
         point = [r * np.cos(current_angle), r * np.sin(current_angle)]
-        max_angle = total_angle - min_angle_offset * max(0, (point_count - len(points) - 1));
-        current_angle = random.uniform(current_angle+min_angle_offset, max_angle)
+        max_angle = total_angle - min_angle_offset * max(0, (point_count - len(points) - 1))
+        current_angle = random.uniform(current_angle+min_angle_offset, min(current_angle+max_angle_offset,max_angle))
         points.append(point)
     return points
 
@@ -97,7 +98,9 @@ def createBSplinePlaneMesh(control_points, mesh_size_factor):
     with pygmsh.occ.Geometry() as geom:
         gmsh.option.setNumber("Mesh.MeshSizeFactor", mesh_size_factor)
         createPlaneSurfaceFromBSpline(geom, control_points)
-        return geom.generate_mesh(dim=2)
+        mesh = geom.generate_mesh(dim=2)
+        return mesh
+
 
 def createPlaneSurfaces(objDirPath, segDirPath, ssegDirPath, minEdges, maxEdges, count):
     surfaceType = "Plane"
@@ -282,13 +285,35 @@ def extrude(geom, input_surface, length):
     return geom.generate_mesh(dim=2)
 
 
-def createExtrusionSurface(mesh_size_factor, points, length):
+def createExtrusionSurface(points, length, mesh_size_factor):
     # So far extrude only bspline surfaces.
     with pygmsh.occ.Geometry() as geom:
+        #gmsh.option.setNumber("Mesh.RandomFactor", 1e-4)
+        #gmsh.option.setNumber("Mesh.ScalingFactor", 10000)
         gmsh.option.setNumber("Mesh.MeshSizeFactor", mesh_size_factor)
         surface = createPlaneSurfaceFromBSpline(geom, points)
         return extrude(geom, surface, length)
 
+def createExtrusionSurfaces(objDirPath, segDirPath, ssegDirPath, minEdges, maxEdges, count):
+    surfaceType = "Extrusion"
+    for i in range(count):
+        name = getSampleName(surfaceType, i)
+        objPath = os.path.join(objDirPath, name + ".obj")
+
+        while(True):
+            # meshing fails sometimes (intersections?, too small areas?), retry until it succeeds.
+            points = sample2DOutline()
+            length = random.random()
+            print("Create {} with BSpline of {} points, length {}: {}".format(name, len(points), length, points))
+            try:
+                mesh = createMeshWithEdgeCount(minEdges, maxEdges, createExtrusionSurface, points, length)
+            except Exception as error:
+                print("Meshing error:", error)
+            else:
+                break
+
+        saveMesh(objPath, mesh)
+        createLabelFiles(mesh, surfaceType, name, segDirPath, ssegDirPath)
 
 def revolve(geom, input_surface, rot_axis=[0.0, 0.0, 1.0], rot_point=[0.0, 0.0, 0.0], angle=2 * pi):
     # num_layers: Optional[Union[int, List[int]]] = None,
@@ -316,7 +341,13 @@ def createRevolutionSurface(mesh_size_factor, points, surface_type, angle=2 * pi
 
 # TODO
 def createBSpline():
-    return None
+    return
+    #C4 = gmsh.model.occ.addBSpline([P4, P10, P8], degree=3)
+    # Create a BSpline surface filling the 4 curves:
+    #W1 = gmsh.model.occ.addWire([C1, C3, C2, C4])
+    # gmsh.model.occ.addBSplineFilling(W1, type="Stretch")
+    #gmsh.model.occ.addBSplineFilling(W1, type="Curved")
+    # gmsh.model.occ.addBSplineFilling(W1, type="Coons") # fails
 
 
 def saveMesh(dstPath, mesh):
@@ -353,7 +384,7 @@ createPath(objPath)
 createPath(segPath)
 createPath(ssegPath)
 
-createPlaneSurfaces(objPath, segPath, ssegPath, minEdges, maxEdges, numSurfaceSamples)
+#createPlaneSurfaces(objPath, segPath, ssegPath, minEdges, maxEdges, numSurfaceSamples)
 
 # createCylinders(objPath,segPath,ssegPath,minEdges,maxEdges,numSurfaceSamples)
 
@@ -363,30 +394,25 @@ createPlaneSurfaces(objPath, segPath, ssegPath, minEdges, maxEdges, numSurfaceSa
 
 # createTori(objPath,segPath,ssegPath,minEdges,maxEdges,numSurfaceSamples)
 
+createExtrusionSurfaces(objPath, segPath, ssegPath, minEdges, maxEdges, numSurfaceSamples)
 
-# saveMesh(os.path.join(dstPath, "torus1.obj"),createTorus(0.2,0.9,variant = "extrude_circle"))
+# for i in range(100):
+#     print(i)
+#     mesh = createMeshWithEdgeCount(minEdges, maxEdges, createExtrusionSurface, [[0.7519487930900727, 0.0], [0.10341455595913596, -0.8150420431156448], [0.09199364012536841, -0.14898113551925904], [0.6567306966263075, -0.3868456062291858]],
+#                                      0.2733698801158831)
+
+# for size in [0.6]: #np.arange(1,0.1,-0.1):
+#     print(size)
+#     points = np.array([[0.7519487930900727, 0.0], [0.10341455595913596, -0.8150420431156448], [0.09199364012536841, -0.14898113551925904], [0.6567306966263075, -0.3868456062291858]])
+#     #points *= 100;
+#     height = 0.2733698801158831;
+#     #height *= 100;
+#     #mesh = createExtrusionSurface(points,height,size)
+#     mesh = createBSplinePlaneMesh(points,size)
+#     print("size {}: {} edges".format(size, getMeshEdgeCount(mesh)))
+
+#mesh = createBSplinePlaneMesh([[0.7519487930900727, 0.0], [0.10341455595913596, -0.8150420431156448], [0.09199364012536841, -0.14898113551925904], [0.6567306966263075, -0.3868456062291858]],1)
+
+#saveMesh(os.path.join(objPath, "test.obj"),mesh)
 
 
-# saveMesh(os.path.join(dstPath, "cyl.obj"), createMeshWithEdgeCount(4500, 5000, createCylinder,
-#                                                                    radius=1, length=5, angle = 2*pi/3))
-# saveMesh(os.path.join(dstPath, "cylinder2div3pi.obj"),createCylinder( radius=1, length=5, angle=2*pi/3))
-# saveMesh(os.path.join(dstPath, "cylinderpi.obj"),createCylinder( radius=1, length=5, angle=pi))
-# saveMesh(os.path.join(dstPath, "cylinderpihalf.obj"),createCylinder( radius=1, length=5, angle=pi/2))
-# saveMesh(os.path.join(dstPath, "cylinderpififth.obj"),createCylinder( radius=1, length=5, angle=pi/5))
-
-# saveMesh(os.path.join(dstPath, "polygon_rev1.obj"), createRevolutionSurface([
-#                 [0.0, 0.2, 0.0],
-#                 [0.0, 1.2, 0.0],
-#                 [0.0, 1.2, 1.0],
-#             ], surface_type="polygon"))
-# saveMesh(os.path.join(dstPath, "bspline_rev1.obj"), createRevolutionSurface([
-#                 [0.0, 0.2, 0.0],
-#                 [0.0, 1.2, 0.0],
-#                 [0.0, 1.2, 1.0],
-#             ], surface_type="bspline"))
-
-# saveMesh(os.path.join(dstPath, "bspline_extr1.obj"), createMeshWithEdgeCount(4500, 5000, createExtrusionSurface, [
-#                 [0.0, 0.2, 0.0],
-#                 [0.0, 1.2, 0.0],
-#                 [1.0, 1.2, 0.0]
-#             ], 1.0))
