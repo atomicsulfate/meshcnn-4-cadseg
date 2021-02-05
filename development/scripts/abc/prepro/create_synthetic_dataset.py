@@ -68,6 +68,7 @@ def createMeshWithEdgeCount(min_edges, max_edges, surface_func, geom, *args, **k
 
         if min_edges <= curr_num_edges <= max_edges:
             #print("Target edges MET with factor {}: {} [{},{}]".format(current_factor, curr_num_edges, min_edges, max_edges))
+            #geom.save_geometry("test.msh")
             return mesh
 
         if (len(num_edges) == 0 and curr_num_edges > max_edges):
@@ -105,12 +106,13 @@ def polygonSelfIntersects(vertices):
                 return True
     return False
 
-def sample2DOutline():
+def sample2DOutline(total_angle=None):
     min_angle_offset = pi / 8
     max_angle_offset = 3*pi/4
     max_point_count = 8
     point_count = random.uniform(3,max_point_count)
-    total_angle = random.uniform(pi / 2, 2 * pi)
+    if (total_angle == None):
+        total_angle = random.uniform(pi / 2, 2 * pi)
     max_radius = random.random()
     min_radius = 0.5 * max_radius
     points = []
@@ -326,22 +328,66 @@ def createExtrusionSurfaces(geom, objDirPath, segDirPath, ssegDirPath, minEdges,
         saveMesh(objPath, mesh)
         createLabelFiles(mesh, surfaceType, name, segDirPath, ssegDirPath)
 
-def revolve(geom, input_surface, rot_axis=[0.0, 0.0, 1.0], rot_point=[0.0, 0.0, 0.0], angle=2 * pi):
-    # num_layers: Optional[Union[int, List[int]]] = None,
-    # heights: Optional[List[float]] = None,
+def revolve(geom, input_surface, rot_axis=[1.0, 0.0, 0.0], rot_point=[0.0, 0.0, 0.0], angle=2 * pi):
     # recombine: bool = False,
     surfaces = geom._revolve(input_surface, rot_axis, rot_point, angle)
-    geom.remove(surfaces[1], False)  # remove volume (must be done first!)
+    volume = geom.env.getEntities(3)
+    geom.env.remove(volume)
     geom.remove(input_surface)  # remove one end
-    if (surfaces[0].dim_tag[1] != input_surface.dim_tag[1]):
-        geom.remove(surfaces[0])  # remove the other end
 
-def createRevolutionSurface(geom, points, surface_type, angle=2 * pi, rot_axis=[0.0, 0.0, 1.0], rot_point=[0.0, 0.0, 0.0]):
+    all_surfaces = surfaces[2][:]
+    if (surfaces[0].dim == 2):
+        all_surfaces.append(surfaces[0])
+    if (surfaces[1].dim == 2):
+        all_surfaces.append(surfaces[1])
+
+    maxIdSurface = all_surfaces[0]
+    for i in range(1,len(all_surfaces)):
+        surf = all_surfaces[i]
+        if (surf.id > maxIdSurface.id):
+            maxIdSurface = surf
+    geom.remove(maxIdSurface)
+
+def revolve_geo(geom, input_surface, rot_axis=[1.0, 0.0, 0.0], rot_point=[0.0, 0.0, 0.0], angle=2*pi):
+    # recombine: bool = False,
+    angle = -pi
+    surfaces = geom._revolve(input_surface, rot_axis, rot_point, angle)
+    geom.remove(surfaces[1], False)  # remove volume (must be done first!)
+    #geom.remove(input_surface)  # remove one end
+    #if (surfaces[0].dim_tag[1] != input_surface.dim_tag[1]):
+    #    geom.remove(surfaces[0])  # remove the other end
+
+def createRevolutionSurface(geom, points, surface_type, angle=2 * pi, rot_axis=[1.0, 0.0, 0.0], rot_point=[0.0, 0.0, 0.0]):
     if (surface_type == "polygon"):
         surface = geom.add_polygon(points)
     else:
         surface = createPlaneSurfaceFromBSpline(geom, points)
     revolve(geom, surface, rot_axis, rot_point, angle)
+
+def createRevolutionSurfaces(geom, objDirPath, segDirPath, ssegDirPath, minEdges, maxEdges, count):
+    surfaceType = "Revolution"
+    generator_types = ["polygon", "bspline"]
+    angle = 2*pi
+    for i in range(count):
+        name = getSampleName(surfaceType, i)
+        objPath = os.path.join(objDirPath, name + ".obj")
+
+        while(True):
+            # meshing fails sometimes (intersections?, too small areas?), retry until it succeeds.
+            points = sample2DOutline(pi)
+            print("Create {} with {} of {} points, angle {}".format(name, generator_types[i%2],len(points), angle))
+            try:
+                mesh = createMeshWithEdgeCount(minEdges, maxEdges, createRevolutionSurface, geom,
+                                               points, generator_types[i%2], angle)
+                #geom.save_geometry(name+ ".msh")
+            except Exception as error:
+                print("Meshing error:", error)
+            else:
+                break
+
+        saveMesh(objPath, mesh)
+        createLabelFiles(mesh, surfaceType, name, segDirPath, ssegDirPath)
+        angle = random.uniform(pi / 8, 2 * pi)
 
 # TODO
 def createBSpline():
@@ -388,8 +434,8 @@ createPath(objPath)
 createPath(segPath)
 createPath(ssegPath)
 
-# with pygmsh.geo.Geometry() as geom:
-#     gmsh.option.setNumber("Mesh.AlgorithmSwitchOnFailure", 0) # Fallback to Mesh-Adapt ends hanging up sometimes.
+#with pygmsh.geo.Geometry() as geom:
+#    gmsh.option.setNumber("Mesh.AlgorithmSwitchOnFailure", 0) # Fallback to Mesh-Adapt ends hanging up sometimes.
 #     createCylinders(geom, objPath,segPath,ssegPath,minEdges,maxEdges,numSurfaceSamples)
 
 with pygmsh.occ.Geometry() as geom:
@@ -406,6 +452,7 @@ with pygmsh.occ.Geometry() as geom:
     #createCones(geom, objPath,segPath,ssegPath,minEdges,maxEdges,numSurfaceSamples)
     #createTori(geom, objPath,segPath,ssegPath,minEdges,maxEdges,numSurfaceSamples)
     #createExtrusionSurfaces(geom, objPath, segPath, ssegPath, minEdges, maxEdges, numSurfaceSamples)
+    createRevolutionSurfaces(geom, objPath, segPath, ssegPath, minEdges, maxEdges, numSurfaceSamples)
 
 # for i in range(100):
 #     print(i)
