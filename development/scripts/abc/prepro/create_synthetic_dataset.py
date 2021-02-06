@@ -68,7 +68,7 @@ def createMeshWithEdgeCount(min_edges, max_edges, surface_func, geom, *args, **k
 
         if min_edges <= curr_num_edges <= max_edges:
             #print("Target edges MET with factor {}: {} [{},{}]".format(current_factor, curr_num_edges, min_edges, max_edges))
-            #geom.save_geometry("test.msh")
+            geom.save_geometry("test.msh")
             return mesh
 
         if (len(num_edges) == 0 and curr_num_edges > max_edges):
@@ -194,12 +194,18 @@ def createCylinders(geom, objDirPath, segDirPath, ssegDirPath, minEdges, maxEdge
     for i in range(count):
         name = getSampleName(surfaceType, i)
         objPath = os.path.join(objDirPath, name + ".obj")
-        print("Create {} with radius {}, length {}, angle {}".format(name, params[0], params[1], params[2]))
-        mesh = createMeshWithEdgeCount(minEdges, maxEdges, createCylinder, geom, *params)
+        while True:
+            print("Create {} with radius {}, length {}, angle {}".format(name, params[0], params[1], params[2]))
+            try:
+                mesh = createMeshWithEdgeCount(minEdges, maxEdges, createCylinder, geom, *params)
+            except Exception as error:
+                print("Meshing error:", error)
+                params = np.random.rand(3) * [1, 1, 2 * pi - min_angle] + [0, 0, min_angle]
+            else:
+                break
         saveMesh(objPath, mesh)
         createLabelFiles(mesh, surfaceType, name, segDirPath, ssegDirPath)
         params = np.random.rand(3) * [1, 1, 2 * pi - min_angle] + [0, 0, min_angle]
-
 
 def createSphere(geom, azimuth, inclination):
     # azimuth [0,pi]
@@ -229,8 +235,17 @@ def createSpheres(geom, objDirPath, segDirPath, ssegDirPath, minEdges, maxEdges,
     for i in range(count):
         name = getSampleName(surfaceType, i)
         objPath = os.path.join(objDirPath, name + ".obj")
-        print("Create {} with angles {}, {}".format(name, angles[0], angles[1]))
-        mesh = createMeshWithEdgeCount(minEdges, maxEdges, createSphere, geom, *angles)
+
+        while True:
+            print("Create {} with angles {}, {}".format(name, angles[0], angles[1]))
+            try:
+                mesh = createMeshWithEdgeCount(minEdges, maxEdges, createSphere, geom, *angles)
+            except Exception as error:
+                print("Meshing error:", error)
+                angles = np.random.rand(2) * [pi - min_angle, 2 * pi - min_angle] + min_angle
+            else:
+                break
+
         saveMesh(objPath, mesh)
         createLabelFiles(mesh, surfaceType, name, segDirPath, ssegDirPath)
         angles = np.random.rand(2) * [pi - min_angle, 2 * pi - min_angle] + min_angle
@@ -255,8 +270,18 @@ def createCones(geom, objDirPath, segDirPath, ssegDirPath, minEdges, maxEdges, c
     for i in range(count):
         name = getSampleName(surfaceType, i)
         objPath = os.path.join(objDirPath, name + ".obj")
-        print("Create {} with r0 {}, r1 {}, height {}, angle {}".format(name, *params))
-        mesh = createMeshWithEdgeCount(minEdges, maxEdges, createCone, geom, *params)
+
+        while True:
+            print("Create {} with r0 {}, r1 {}, height {}, angle {}".format(name, *params))
+            try:
+                mesh = createMeshWithEdgeCount(minEdges, maxEdges, createCone, geom, *params)
+            except Exception as error:
+                print("Meshing error:", error)
+                params = np.random.rand(4)
+                params = params * [1, 1, max_r1_factor * params[0], 2 * pi - min_angle] + [0, 0, 0, min_angle]
+            else:
+                break
+
         saveMesh(objPath, mesh)
         createLabelFiles(mesh, surfaceType, name, segDirPath, ssegDirPath)
         params = np.random.rand(4)
@@ -288,8 +313,18 @@ def createTori(geom, objDirPath, segDirPath, ssegDirPath, minEdges, maxEdges, co
     for i in range(count):
         name = getSampleName(surfaceType, i)
         objPath = os.path.join(objDirPath, name + ".obj")
-        print("Create {} with orad {}, irad {}, angle {}".format(name, params[0], params[1], params[2]))
-        mesh = createMeshWithEdgeCount(minEdges, maxEdges, createTorus, geom, *params)
+
+        while True:
+            print("Create {} with orad {}, irad {}, angle {}".format(name, params[0], params[1], params[2]))
+            try:
+                mesh = createMeshWithEdgeCount(minEdges, maxEdges, createTorus, geom, *params)
+            except Exception as error:
+                print("Meshing error:", error)
+                params = np.random.rand(3)
+                params = params * [1, params[0] * max_irad_factor, 2 * pi - min_angle] + [0, 0, min_angle]
+            else:
+                break
+
         saveMesh(objPath, mesh)
         createLabelFiles(mesh, surfaceType, name, segDirPath, ssegDirPath)
         params = np.random.rand(3)
@@ -389,16 +424,57 @@ def createRevolutionSurfaces(geom, objDirPath, segDirPath, ssegDirPath, minEdges
         createLabelFiles(mesh, surfaceType, name, segDirPath, ssegDirPath)
         angle = random.uniform(pi / 8, 2 * pi)
 
-# TODO
-def createBSpline():
-    return
-    #C4 = gmsh.model.occ.addBSpline([P4, P10, P8], degree=3)
-    # Create a BSpline surface filling the 4 curves:
-    #W1 = gmsh.model.occ.addWire([C1, C3, C2, C4])
-    # gmsh.model.occ.addBSplineFilling(W1, type="Stretch")
-    #gmsh.model.occ.addBSplineFilling(W1, type="Curved")
-    # gmsh.model.occ.addBSplineFilling(W1, type="Coons") # fails
+def createBSplineSurface(geom, r, azimuth, inclination, num_divs_az, num_divs_inc, ctrl_point_heights):
+    inc = pi/20
+    inc_step = inclination / num_divs_inc
+    az_step = azimuth / num_divs_az
+    point_tags = []
+    points = []
+    for i in range(num_divs_inc+1):
+        az = 0
+        for j in range(num_divs_az+1):
+            p =geom.add_point([r*np.sin(inc)*np.cos(az), r*np.sin(inc)*np.sin(az), r*np.cos(inc)+ctrl_point_heights[i*(num_divs_az+1)+j]])
+            point_tags.append(p._id)
+            points.append(p)
+            az += az_step
+        inc += inc_step
+    geom.env.addBSplineSurface(point_tags, num_divs_az+1) # -1, 4,4
 
+def createBSplineSurfaces(geom, objDirPath, segDirPath, ssegDirPath, minEdges, maxEdges, count):
+    surfaceType = "BSpline"
+    min_angle = pi / 20
+
+    for i in range(count):
+        name = getSampleName(surfaceType, i)
+        objPath = os.path.join(objDirPath, name + ".obj")
+
+        while True:
+            inclination = np.random.uniform(min_angle, pi)
+            azimuth = np.random.uniform(min_angle, 2*pi)
+            radius = np.random.uniform(0.1, 1)
+            num_divs_inc = round(np.random.uniform(2, 10))
+            num_divs_az = round(np.random.uniform(2, 10))
+            num_ctrl_points = (num_divs_inc+1)*(num_divs_az+1)
+            ctrl_point_heights = np.random.default_rng().random(num_ctrl_points) * radius/2 - radius/4
+            # for i in range(num_ctrl_points):
+            #     min_height = -radius/2
+            #     max_height = radius/2
+            #     if (i>0):
+            #         min_height = max(min_height, ctrl_point_heights[-1]*)
+            #     np.random.uniform()
+
+            print("Create {} of {}x{} ctrl points around sphere patch with angles {}, {}, radius {}"
+                  .format(name, num_divs_az+1, num_divs_inc+1, inclination,azimuth, radius))
+            try:
+                mesh = createMeshWithEdgeCount(minEdges, maxEdges, createBSplineSurface, geom, radius, azimuth, inclination,
+                                               num_divs_az, num_divs_inc, ctrl_point_heights)
+            except Exception as error:
+                print("Meshing error:", error)
+            else:
+                break
+
+        saveMesh(objPath, mesh)
+        createLabelFiles(mesh, surfaceType, name, segDirPath, ssegDirPath)
 
 def saveMesh(dstPath, mesh):
     mesh.remove_lower_dimensional_cells()
@@ -434,9 +510,9 @@ createPath(objPath)
 createPath(segPath)
 createPath(ssegPath)
 
-#with pygmsh.geo.Geometry() as geom:
-#    gmsh.option.setNumber("Mesh.AlgorithmSwitchOnFailure", 0) # Fallback to Mesh-Adapt ends hanging up sometimes.
-#     createCylinders(geom, objPath,segPath,ssegPath,minEdges,maxEdges,numSurfaceSamples)
+with pygmsh.geo.Geometry() as geom:
+    gmsh.option.setNumber("Mesh.AlgorithmSwitchOnFailure", 0) # Fallback to Mesh-Adapt ends hanging up sometimes.
+    createCylinders(geom, objPath,segPath,ssegPath,minEdges,maxEdges,numSurfaceSamples)
 
 with pygmsh.occ.Geometry() as geom:
     #gmsh.option.setNumber("Mesh.RandomFactor", 1e-4)
@@ -447,33 +523,13 @@ with pygmsh.occ.Geometry() as geom:
     #gmsh.option.setNumber("Mesh.RefineSteps", 2)
     # gmsh.option.setNumber("General.Terminal", 1)
     gmsh.option.setNumber("Mesh.AlgorithmSwitchOnFailure", 0) # Fallback to Mesh-Adapt ends hanging up sometimes.
-    #createPlaneSurfaces(geom, objPath, segPath, ssegPath, minEdges, maxEdges, numSurfaceSamples)
-    #createSpheres(geom, objPath,segPath,ssegPath,minEdges,maxEdges,numSurfaceSamples)
-    #createCones(geom, objPath,segPath,ssegPath,minEdges,maxEdges,numSurfaceSamples)
-    #createTori(geom, objPath,segPath,ssegPath,minEdges,maxEdges,numSurfaceSamples)
-    #createExtrusionSurfaces(geom, objPath, segPath, ssegPath, minEdges, maxEdges, numSurfaceSamples)
+    createPlaneSurfaces(geom, objPath, segPath, ssegPath, minEdges, maxEdges, numSurfaceSamples)
+    createSpheres(geom, objPath,segPath,ssegPath,minEdges,maxEdges,numSurfaceSamples)
+    createCones(geom, objPath,segPath,ssegPath,minEdges,maxEdges,numSurfaceSamples)
+    createTori(geom, objPath,segPath,ssegPath,minEdges,maxEdges,numSurfaceSamples)
+    createExtrusionSurfaces(geom, objPath, segPath, ssegPath, minEdges, maxEdges, numSurfaceSamples)
     createRevolutionSurfaces(geom, objPath, segPath, ssegPath, minEdges, maxEdges, numSurfaceSamples)
+    createBSplineSurfaces(geom, objPath, segPath, ssegPath, minEdges, maxEdges, numSurfaceSamples)
 
-# for i in range(100):
-#     print(i)
-#     mesh = createMeshWithEdgeCount(minEdges, maxEdges, createExtrusionSurface, [[0.7519487930900727, 0.0], [0.10341455595913596, -0.8150420431156448], [0.09199364012536841, -0.14898113551925904], [0.6567306966263075, -0.3868456062291858]],
-#                                      0.2733698801158831)
-
-# for size in [0.6]: #np.arange(1,0.1,-0.1):
-#     print(size)
-#     points = np.array([[0.7519487930900727, 0.0], [0.10341455595913596, -0.8150420431156448], [0.09199364012536841, -0.14898113551925904], [0.6567306966263075, -0.3868456062291858]])
-#     #points *= 100;
-#     height = 0.2733698801158831;
-#     #height *= 100;
-#     #mesh = createExtrusionSurface(points,height,size)
-#     mesh = createBSplinePlaneMesh(points,size)
-#     print("size {}: {} edges".format(size, getMeshEdgeCount(mesh)))
-
-#mesh = createBSplinePlaneMesh([[0.7519487930900727, 0.0], [0.10341455595913596, -0.8150420431156448], [0.09199364012536841, -0.14898113551925904], [0.6567306966263075, -0.3868456062291858]],1)
-
-
-#mesh = createBSplinePlaneMesh([[0.5903707163623527, 0.0], [0.018042820066265425, 0.016750239890347168], [0.02918982515626252, 0.19723669480227274], [-0.59659475796762, 0.22441950555967607]],4)
-
-#saveMesh(os.path.join(objPath, "test.obj"),mesh)
 
 
