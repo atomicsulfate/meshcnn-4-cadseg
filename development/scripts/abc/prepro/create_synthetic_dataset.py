@@ -8,6 +8,11 @@ import random
 import numpy as np
 from numpy.polynomial import Polynomial
 import sympy as sp
+import sys
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__),"../../..")))
+
+from meshcnn.models.layers.mesh_prepare import build_gemm, remove_non_manifolds
 
 surfaceTypes = ['Plane', 'Revolution', 'Cylinder', 'Extrusion', 'Cone', 'Other', 'Sphere', 'Torus', 'BSpline']
 
@@ -15,13 +20,31 @@ surfaceTypes = ['Plane', 'Revolution', 'Cylinder', 'Extrusion', 'Cone', 'Other',
 def getSampleName(surfaceType, id):
     return "{}_{}".format(surfaceType, id)
 
+def getMeshFaceCount(mesh):
+    return round(len(mesh.get_cells_type("triangle")))
 
-def getMeshEdgeCount(mesh):
-    return round(len(mesh.get_cells_type("triangle")) * 1.5)
+def getEstMeshEdgeCount(mesh):
+    return getMeshFaceCount(mesh)* 1.525
 
+def setExactMeshEdgeCount(mesh):
+    class MeshData:
+        def __getitem__(self, item):
+            return eval('self.' + item)
+
+    try:
+        meshData = MeshData()
+        meshData.edge_areas = []
+        meshData.vs = mesh.points
+        meshData.faces = mesh.get_cells_type('triangle')
+        meshData.v_mask = np.ones(len(meshData.vs), dtype=bool)
+        faces, face_areas = remove_non_manifolds(meshData, meshData.faces)
+        build_gemm(meshData, faces, face_areas)
+        mesh.edge_count = meshData.edges_count
+    except Exception as error:
+        print("mesh error", error)
 
 def createLabelFiles(mesh, surfaceType, filename, segPath, ssegPath):
-    edge_count = getMeshEdgeCount(mesh)
+    edge_count = mesh.edge_count
     label = surfaceTypes.index(surfaceType)
     hard_labels = int(label) * np.ones(edge_count, dtype='int')
     np.savetxt(os.path.join(segPath, filename + ".eseg"), hard_labels, fmt='%d')
@@ -49,26 +72,28 @@ def createMeshWithEdgeCount(min_edges, max_edges, surface_func, geom, *args, **k
     last_num_edges = -inf
     last_factor = current_factor
     num_iters = 0
-    max_iters = 10
+    max_iters = 20
 
     while (num_iters < max_iters):
         gmsh.clear()
         gmsh.model.mesh.clear()
+        gmsh.model.mesh.getNodes()
         #print("Trying with factor", current_factor)
         gmsh.option.setNumber("Mesh.MeshSizeFactor", current_factor)
         surface_func(geom, *args,**kwargs)
         mesh = geom.generate_mesh(dim=2) #, verbose=True)
-        curr_num_edges = getMeshEdgeCount(mesh)
-        if (curr_num_edges == 0):
+        face_count = getMeshFaceCount(mesh)
+        if (face_count == 0):
             # restart gmsh, sometimes it deadlocks
             print("Internal gmsh error! Restarting gmsh")
             geom.__exit__()
             geom.__enter__()
             continue
-
-        if min_edges <= curr_num_edges <= max_edges:
+        curr_num_edges = getEstMeshEdgeCount(mesh)
+        setExactMeshEdgeCount(mesh)
+        if min_edges <= mesh.edge_count <= max_edges:
             #print("Target edges MET with factor {}: {} [{},{}]".format(current_factor, curr_num_edges, min_edges, max_edges))
-            geom.save_geometry("test.msh")
+            #geom.save_geometry("test.msh")
             return mesh
 
         if (len(num_edges) == 0 and curr_num_edges > max_edges):
@@ -92,7 +117,7 @@ def createMeshWithEdgeCount(min_edges, max_edges, surface_func, geom, *args, **k
                 if (current_factor == None):
                     raise Exception("Factor could not be estimated")
         num_iters += 1
-    raise Exception("Didn't converge to target edges in 10 iterations")
+    raise Exception("Didn't converge to target edges in 20 iterations")
 
 def polygonSelfIntersects(vertices):
     lastSide = sp.Segment(vertices[-1],vertices[0])
@@ -189,7 +214,7 @@ def createCylinder(geom, radius, length, angle):
 
 def createCylinders(geom, objDirPath, segDirPath, ssegDirPath, minEdges, maxEdges, count):
     surfaceType = "Cylinder"
-    min_angle = pi / 20
+    min_angle = pi / 8 # Keep cylinder from looking like a plane
     params = [1, 1, 2 * pi]
     for i in range(count):
         name = getSampleName(surfaceType, i)
@@ -264,9 +289,12 @@ def createCone(geom, radius0, height, radius1, angle):
 
 def createCones(geom, objDirPath, segDirPath, ssegDirPath, minEdges, maxEdges, count):
     surfaceType = "Cone"
-    min_angle = pi / 20
-    max_r1_factor = 0.9  # set a maximum radius1 ratio wrt radius0 to keep the cone from looking like a cylinder.
+    min_angle = pi / 6 # Keep cone from looking like a plane
+    max_r1_factor = 0.7  # set a maximum radius1 ratio wrt radius0 to keep the cone from looking like a cylinder.
     params = [1, 1, 0, 2 * pi]
+    min_height_factor = 0.2 # set min height factor wrt radius0 to keep cone from looking like a plane
+    max_height_factor = 5 # set max height factor wrt radius0 to keep cone from looking like a cylinder
+
     for i in range(count):
         name = getSampleName(surfaceType, i)
         objPath = os.path.join(objDirPath, name + ".obj")
@@ -284,8 +312,10 @@ def createCones(geom, objDirPath, segDirPath, ssegDirPath, minEdges, maxEdges, c
 
         saveMesh(objPath, mesh)
         createLabelFiles(mesh, surfaceType, name, segDirPath, ssegDirPath)
+
         params = np.random.rand(4)
-        params = params * [1, 1, max_r1_factor * params[0], 2 * pi - min_angle] + [0, 0, 0, min_angle]
+        params = params * [1, (max_height_factor-min_height_factor)*params[0], max_r1_factor * params[0], 2 * pi - min_angle] \
+                 + [0, min_height_factor*params[0], 0, min_angle]
 
 
 def createTorus(geom, orad, irad, angle):
@@ -510,9 +540,9 @@ createPath(objPath)
 createPath(segPath)
 createPath(ssegPath)
 
-with pygmsh.geo.Geometry() as geom:
-    gmsh.option.setNumber("Mesh.AlgorithmSwitchOnFailure", 0) # Fallback to Mesh-Adapt ends hanging up sometimes.
-    createCylinders(geom, objPath,segPath,ssegPath,minEdges,maxEdges,numSurfaceSamples)
+# with pygmsh.geo.Geometry() as geom:
+#     gmsh.option.setNumber("Mesh.AlgorithmSwitchOnFailure", 0) # Fallback to Mesh-Adapt ends hanging up sometimes.
+#     createCylinders(geom, objPath,segPath,ssegPath,minEdges,maxEdges,numSurfaceSamples)
 
 with pygmsh.occ.Geometry() as geom:
     #gmsh.option.setNumber("Mesh.RandomFactor", 1e-4)
@@ -523,13 +553,15 @@ with pygmsh.occ.Geometry() as geom:
     #gmsh.option.setNumber("Mesh.RefineSteps", 2)
     # gmsh.option.setNumber("General.Terminal", 1)
     gmsh.option.setNumber("Mesh.AlgorithmSwitchOnFailure", 0) # Fallback to Mesh-Adapt ends hanging up sometimes.
-    createPlaneSurfaces(geom, objPath, segPath, ssegPath, minEdges, maxEdges, numSurfaceSamples)
-    createSpheres(geom, objPath,segPath,ssegPath,minEdges,maxEdges,numSurfaceSamples)
-    createCones(geom, objPath,segPath,ssegPath,minEdges,maxEdges,numSurfaceSamples)
-    createTori(geom, objPath,segPath,ssegPath,minEdges,maxEdges,numSurfaceSamples)
-    createExtrusionSurfaces(geom, objPath, segPath, ssegPath, minEdges, maxEdges, numSurfaceSamples)
+    # createPlaneSurfaces(geom, objPath, segPath, ssegPath, minEdges, maxEdges, numSurfaceSamples)
+    # createSpheres(geom, objPath,segPath,ssegPath,minEdges,maxEdges,numSurfaceSamples)
+    # createCones(geom, objPath,segPath,ssegPath,minEdges,maxEdges,numSurfaceSamples)
+    # createTori(geom, objPath,segPath,ssegPath,minEdges,maxEdges,numSurfaceSamples)
+
+    # createBSplineSurfaces(geom, objPath, segPath, ssegPath, minEdges, maxEdges, numSurfaceSamples)
+
     createRevolutionSurfaces(geom, objPath, segPath, ssegPath, minEdges, maxEdges, numSurfaceSamples)
-    createBSplineSurfaces(geom, objPath, segPath, ssegPath, minEdges, maxEdges, numSurfaceSamples)
+    createExtrusionSurfaces(geom, objPath, segPath, ssegPath, minEdges, maxEdges, numSurfaceSamples)
 
 
 

@@ -60,6 +60,7 @@ def takeMesh(objPath,minEdges,maxEdges):
                                                                               mesh.edges_count/ mesh.faces_count))
         return True
     else:
+        print("Discarding {} with {} edges".format(objPath,mesh.edges_count))
         return False
 
 def addMesh(srcPath, dstPath):

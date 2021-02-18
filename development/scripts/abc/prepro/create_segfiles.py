@@ -87,7 +87,7 @@ def createSegFiles(segFilePath, ssegFilePath, featFilePath, mesh):
 
 def getTargetDatasetRoot(links):
     assert(len(links) > 0)
-    targetObj = os.readlink(links[0])
+    targetObj = os.readlink(links[0]) if os.path.islink(links[0]) else links[0]
     pathToObjDir = os.path.split(targetObj)[0]
     objPrefixPath, _ = os.path.split(pathToObjDir)
     return os.path.split(objPrefixPath)[0]
@@ -145,11 +145,10 @@ if __name__=='__main__':
 
 
     objLinks.sort()
-    objFileTargets = list(map(lambda link: os.readlink(link),objLinks))
+    objFileTargets = list(map(lambda link: os.readlink(link),objLinks)) if os.path.islink(objLinks[0]) else objLinks
     featFilePaths = list(map(objPathToFeatPath,objFileTargets))
 
-    for objLink in objLinks:
-        objPath = os.readlink(objLink)
+    for objPath in objFileTargets:
         fileNamePrefix = os.path.splitext(os.path.basename(objPath))[0]
         segFilePath = os.path.join(targetSegPath,fileNamePrefix+ segExt)
         ssegFilePath = os.path.join(targetSSegPath,fileNamePrefix+ ssegExt)

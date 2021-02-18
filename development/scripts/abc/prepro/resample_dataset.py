@@ -3,6 +3,8 @@ import os, sys, yaml
 import numpy as np
 from pathlib import Path
 import random
+import threading
+import argparse
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__),"../../..")))
 
@@ -57,63 +59,96 @@ def selectSample(surfaceTypeFaceCount):
 def addMesh(srcPath, dstPath):
     os.symlink(os.path.abspath(srcPath),os.path.join(dstPath,os.path.basename(srcPath)))
 
-if len(sys.argv) < 4:
-    print("Wrong parameters")
-    exit(1)
+def thread_function(objFileTargets, results):
+    results["totals"] = np.zeros(len(surfaceTypes), dtype=int)
+    results["selected"] = []
+    objFileTargets = objFileTargets[:5]
+    threadId = threading.current_thread()
 
-oldDatasetRoot = sys.argv[1]
-newDatasetRoot = sys.argv[2]
-testTrainRatio = float(sys.argv[3])
+    for objPath in objFileTargets:
+        surfaceTypeFaceCount = getSurfaceTypeFaceCount(objPathToFeatPath(objPath))
+        if (selectSample(surfaceTypeFaceCount)):
+            results["selected"].append(objPath)
+            print("{}: {} -> {}".format(threadId, os.path.relpath(objPath, targetDatasetRoot), surfaceTypeFaceCount))
+            results["totals"] += surfaceTypeFaceCount
+            # if (len(selectedObjPaths) % 20 == 0):
+            #     print("Totals after {} samples: {}".format(len(selectedObjPaths),
+            #                                                totalSurfaceTypeFaceCount * 100 / totalSurfaceTypeFaceCount.sum()))
 
-objLinks = getObjLinks(oldDatasetRoot)
+if __name__ == '__main__':
 
-if (len(objLinks) == 0):
-    print("No obj files found in", oldDatasetRoot)
-    exit(1)
+    parser = argparse.ArgumentParser("Resample dataset removing samples with only planes or cylinder surfaces")
+    parser.add_argument('--src', required=True, type=str, help="Path where source dataset is located")
+    parser.add_argument('--dst', required=True, type=str, help="Path where dataset will be saved")
+    parser.add_argument('--testRatio', default=0.2, type=float, help="Test/train ratio")
+    parser.add_argument('--numThreads', type=int, default=7, help="Number of threads")
 
-dstTrainPath = os.path.join(newDatasetRoot,"train")
-dstTestPath = os.path.join(newDatasetRoot,"test")
+    args = parser.parse_args()
 
-try:
-    Path(dstTrainPath).mkdir(parents=True, exist_ok=False)
-    Path(dstTestPath).mkdir(parents=True, exist_ok=False)
-except FileExistsError as f_error:
-    print(f_error)
-    exit(1)
+    oldDatasetRoot = args.src
+    newDatasetRoot = args.dst
+    testTrainRatio = args.testRatio
+    numThreads = args.numThreads
 
-targetDatasetRoot = getTargetDatasetRoot(objLinks)
+    objLinks = getObjLinks(oldDatasetRoot)
 
-print("Resampling dataset {} (targets in {}) with {} obj files into {}".format(oldDatasetRoot, targetDatasetRoot, len(objLinks), newDatasetRoot))
+    if (len(objLinks) == 0):
+        print("No obj files found in", oldDatasetRoot)
+        exit(1)
 
-objLinks.sort()
-objFileTargets = list(map(lambda link: os.readlink(link),objLinks))
-featFilePaths = list(map(objPathToFeatPath,objFileTargets))
+    dstTrainPath = os.path.join(newDatasetRoot,"train")
+    dstTestPath = os.path.join(newDatasetRoot,"test")
 
-totalSurfaceTypeFaceCount = np.zeros(len(surfaceTypes), dtype=int)
-selectedObjPaths = []
+    try:
+        Path(dstTrainPath).mkdir(parents=True, exist_ok=False)
+        Path(dstTestPath).mkdir(parents=True, exist_ok=False)
+    except FileExistsError as f_error:
+        print(f_error)
+        exit(1)
 
-for objLink in objLinks:
-    objPath = os.readlink(objLink)
-    surfaceTypeFaceCount = getSurfaceTypeFaceCount(objPathToFeatPath(objPath))
-    if (selectSample(surfaceTypeFaceCount)):
-        selectedObjPaths.append(objPath)
-        print("{}: {}".format(os.path.relpath(objPath,targetDatasetRoot), surfaceTypeFaceCount))
-        totalSurfaceTypeFaceCount += surfaceTypeFaceCount
-        if (len(selectedObjPaths) % 20 == 0):
-            print("Totals after {} samples: {}".format(len(selectedObjPaths), totalSurfaceTypeFaceCount * 100 / totalSurfaceTypeFaceCount.sum()))
+    targetDatasetRoot = getTargetDatasetRoot(objLinks)
 
-random.shuffle(selectedObjPaths)
-numTotalSamples = len(selectedObjPaths)
-numTestSamples = int(numTotalSamples * testTrainRatio)
-numTrainSamples = numTotalSamples - numTestSamples
+    print("Resampling dataset {} (targets in {}) with {} obj files into {}".format(oldDatasetRoot, targetDatasetRoot, len(objLinks), newDatasetRoot))
 
-for samplePath in selectedObjPaths[:numTrainSamples]:
-    addMesh(samplePath, dstTrainPath)
+    #objLinks.sort()
+    objFileTargets = list(map(lambda link: os.readlink(link),objLinks))
+    #featFilePaths = list(map(objPathToFeatPath,objFileTargets))
 
-for samplePath in selectedObjPaths[numTrainSamples:]:
-    addMesh(samplePath, dstTestPath)
+    totalSurfaceTypeFaceCount = np.zeros(len(surfaceTypes), dtype=int)
+    selectedObjPaths = []
 
-print("Resampled dataset {} samples, ({} train, {} test), surface frequencies {}".format(numTotalSamples, numTrainSamples, numTestSamples, totalSurfaceTypeFaceCount * 100 / totalSurfaceTypeFaceCount.sum()))
+    thLinkCount = int(len(objFileTargets) / numThreads)
+
+    threads = []
+    results = []
+    for index in range(numThreads):
+        thListBegin = index * thLinkCount
+        thListEnd = len(objFileTargets) if index == (numThreads - 1) else thListBegin + thLinkCount
+        print("Process {} takes models [{},{}]".format(index, thListBegin, thListEnd))
+        thList = objFileTargets[thListBegin:thListEnd]
+        results.append({})
+        th = threading.Thread(target=thread_function, args=(thList, results[index]))
+        threads.append(th)
+        th.start()
+
+    for i in range(numThreads):
+        threads[i].join()
+        totalSurfaceTypeFaceCount += results[i]["totals"]
+        selectedObjPaths += results[i]["selected"]
+
+
+    random.shuffle(selectedObjPaths)
+    numTotalSamples = len(selectedObjPaths)
+    numTestSamples = int(numTotalSamples * testTrainRatio)
+    numTrainSamples = numTotalSamples - numTestSamples
+
+    for samplePath in selectedObjPaths[:numTrainSamples]:
+        addMesh(samplePath, dstTrainPath)
+
+    for samplePath in selectedObjPaths[numTrainSamples:]:
+        addMesh(samplePath, dstTestPath)
+
+    print("Resampled dataset {} samples, ({} train, {} test), surface frequencies {}".format(numTotalSamples, numTrainSamples, numTestSamples, totalSurfaceTypeFaceCount * 100 / totalSurfaceTypeFaceCount.sum()))
 
 
 
