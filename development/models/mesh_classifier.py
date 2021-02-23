@@ -1,5 +1,6 @@
 import torch
 from meshcnn.models import networks
+from models.loss import define_loss
 from meshcnn.models.mesh_classifier import ClassifierModel
 from os.path import join
 from util.util import print_network
@@ -30,7 +31,7 @@ class DistributedClassifierModel(ClassifierModel):
                                               [self.gpu_id], opt.arch, opt.init_type, opt.init_gain)
         self.net = DistributedDataParallel(self.net, device_ids=[self.gpu_id])
         self.set_train(opt.is_train)
-        self.criterion = networks.define_loss(opt).to(self.device)
+        self.criterion = define_loss(opt).to(self.device)
 
         if self.is_train:
             self.optimizer = torch.optim.Adam(self.net.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
