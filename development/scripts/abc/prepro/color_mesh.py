@@ -1,11 +1,6 @@
 
-import os, sys, yaml
-from pathlib import Path
+import os, sys
 import argparse
-import math
-import numpy as np
-import random
-import pymesh
 import numpy as np
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__),"../../..")))
@@ -13,12 +8,13 @@ from scripts.abc.prepro.create_segfiles import getEdgeHardLabels, objPathToFeatP
 from meshcnn.models.layers.mesh_prepare import fill_from_file,remove_non_manifolds, build_gemm
 
 
-def colorMesh(mesh, segLabels, dstPath):
+def colorMesh(mesh, segLabels, srcPath, dstPath):
+    dstFilePath = os.path.join(dstPath, os.path.basename(srcPath))
     faces = mesh.faces
     new_indices = np.zeros(mesh.v_mask.shape[0], dtype=np.int32)
     new_indices[mesh.v_mask] = np.arange(0, np.ma.where(mesh.v_mask)[0].shape[0])
 
-    with open(dstPath, 'w') as f:
+    with open(dstFilePath, 'w') as f:
         for vi, v in enumerate(mesh.vs):
             f.write("v %f %f %f\n" % (v[0], v[1], v[2]))
         for face_id in range(len(faces) - 1):
@@ -53,7 +49,8 @@ def tryLoadMesh(objPath):
 
 def objPathToSegPath(objPath):
     pathToObjDir,objFName = os.path.split(objPath)
-    datasetPath = os.path.split(os.path.split(pathToObjDir)[0])[0]
+    datasetPath = os.path.split(os.path.split(pathToObjDir)[0])[0] if os.path.basename(pathToObjDir) != "obj" \
+        else os.path.split(pathToObjDir)[0]
     segDirPath = os.path.join(datasetPath,"seg")
     segFName = os.path.splitext(objFName)[0] + ".eseg"
     return os.path.join(segDirPath, segFName)
@@ -62,8 +59,8 @@ def loadSegLabels(segPath):
     return np.loadtxt(open(segPath, 'r'), dtype='float64')
 
 parser = argparse.ArgumentParser("Color mesh surfaces by type")
-parser.add_argument('--src', required=True, type=str, help="Path to source obj file")
-parser.add_argument('--dst', required=True, type=str, help="Path to new obj file")
+parser.add_argument('--src', nargs='+', type=str, help="Path to source obj files")
+parser.add_argument('--dst', required=True, type=str, help="Path where colored obj files will be saved")
 # parser.add_argument('--minEdges', type=int, default=0, help="Min number of edges to add a mesh to the dataset")
 # parser.add_argument('--maxEdges', type=int, default=math.inf, help="Max number of edges to add a mesh to the dataset")
 # parser.add_argument('--maxSamples', type=int, default=math.inf, help="Max dataset size")
@@ -72,33 +69,25 @@ parser.add_argument('--dst', required=True, type=str, help="Path to new obj file
 
 args = parser.parse_args()
 
-srcPath = args.src
+srcPaths = args.src
 dstPath = args.dst
 
 
-if (not os.path.exists(srcPath)):
-    print(srcPath,"does not exist")
-    exit(1)
+for srcPath in srcPaths:
+    segPath = objPathToSegPath(srcPath)
+    mesh = tryLoadMesh(srcPath)
 
-if (os.path.exists(dstPath)):
-    print(dstPath, "already exists")
-    exit(1)
+    if (mesh == None):
+        continue
 
-segPath = objPathToSegPath(srcPath)
+    segLabels = None
+    if (os.path.exists(segPath)):
+        segLabels = loadSegLabels(segPath)
+    else:
+        segLabels = getEdgeHardLabels(mesh, objPathToFeatPath(srcPath))
 
-mesh = tryLoadMesh(srcPath)
-
-if (mesh == None):
-    exit(1)
-
-segLabels = None
-if (os.path.exists(segPath)):
-    segLabels = loadSegLabels(segPath)
-else:
-    segLabels = getEdgeHardLabels(mesh, objPathToFeatPath(srcPath))
-
-print("Color mesh {} with labels {}, result in {}".format(srcPath,segPath, dstPath))
-colorMesh(mesh,segLabels,dstPath)
+    print("Color mesh {} with labels {}, result in {}".format(srcPath,segPath, dstPath))
+    colorMesh(mesh,segLabels,srcPath, dstPath)
 
 
 
