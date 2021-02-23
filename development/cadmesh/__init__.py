@@ -40,16 +40,15 @@ def read_step_file(filename, return_as_shapes=False, verbosity=False):
             step_reader.PrintCheckLoad(failsonly, IFSelect_ItemsByEntity)
             step_reader.PrintCheckTransfer(failsonly, IFSelect_ItemsByEntity)
         shapes = []
-        nr = 1
         try:
-            while True:
+            total_roots = step_reader.NbRootsForTransfer();
+            for nr in range(1,total_roots+1):
                 ok = step_reader.TransferRoot(nr)
                 if not ok:
                     break
                 _nbs = step_reader.NbShapes()
                 shapes.append(step_reader.Shape(nr))  # a compound
                 #assert not shape_to_return.IsNull()
-                nr += 1
         except:
             print("No Shape", nr)
     else:
@@ -382,7 +381,7 @@ def mesh_model(model, max_size=1e-5, tolerance=1e-7, repair=False, terminal=1):
     #    print(len(list(occ_topo.edges())))
     #    tot += len(list(occ_topo.edges()))
     occ_cnt = 0
-    bbox =  get_boundingbox(occ_steps[occ_cnt], use_mesh=True)
+    bbox =  get_boundingbox(occ_steps[occ_cnt], use_mesh=False)
     diag = np.sqrt(bbox[6]**2+bbox[7]**2+bbox[8]**2)
     max_length = diag * max_size#, 9e-06
     tolerance = diag * tolerance
@@ -397,11 +396,14 @@ def mesh_model(model, max_size=1e-5, tolerance=1e-7, repair=False, terminal=1):
     #occ_props = GProp_GProps()
     #occ_brt = BRep_Tool()
 
-    # Gmsh definitions 
+    # Gmsh definitions
     gmsh.initialize()
     gmsh.option.setNumber("General.Terminal", terminal)
     gmsh.clear()
-    gmsh.option.setNumber("Geometry.Tolerance", tolerance)
+    if (tolerance > 1e6):
+        print("Ignoring large tolerance:", tolerance)
+    else:
+        gmsh.option.setNumber("Geometry.Tolerance", tolerance)
     gmsh.option.setNumber("Geometry.OCCFixDegenerated", 0)
     gmsh.option.setNumber("Geometry.OCCFixSmallEdges", 0)
     gmsh.option.setNumber("Geometry.OCCFixSmallFaces", 0)
@@ -409,38 +411,33 @@ def mesh_model(model, max_size=1e-5, tolerance=1e-7, repair=False, terminal=1):
     #gmsh.option.setNumber("Mesh.MeshSizeMax", max_length)
     gmsh.option.setNumber("Mesh.MeshSizeFactor", max_size)
     gmsh.option.setNumber("Mesh.AlgorithmSwitchOnFailure", 0)  # Fallback to Mesh-Adapt ends hanging up sometimes.
-    gmsh.option.setNumber("General.NumThreads", 6)
-    gmsh.option.setNumber("Mesh.MaxNumThreads1D",6)
-    gmsh.option.setNumber("Mesh.MaxNumThreads2D",6)
+    # gmsh.option.setNumber("General.NumThreads", 6)
+    # gmsh.option.setNumber("Mesh.MaxNumThreads1D",6)
+    # gmsh.option.setNumber("Mesh.MaxNumThreads2D",6)
     gmsh.option.setNumber("Mesh.MeshSizeFromCurvature", 1)
     gmsh.option.setNumber("Mesh.MinimumElementsPerTwoPi",8)
     gmsh.option.setNumber("General.ExpertMode",1)
-    gmsh.open(model)
 
-    # Gmsh meshing
-    #gmsh.model.mesh.generate(1)
-    #gmsh.model.mesh.refine()
-    #gmsh.model.mesh.refine()
-    gmsh.model.mesh.generate(2)
-    #gmsh.write("results/" + file + ".stl")
-    gmsh_edges = gmsh.model.getEntities(1)
-    gmsh_surfs = gmsh.model.getEntities(2)
-    #print("O", tot, "G", len(gmsh_edges))
-    #continue
-    gmsh_entities = gmsh.model.getEntities()
-    #gmsh.model.occ.synchronize()
-    #print(dir(gmsh.model.occ))
     total_edges = 0
     total_surfs = 0
+
     for l in range(len(occ_steps)):
         topo = TopologyExplorer(occ_steps[l])
         total_edges += len(list(topo.edges()))
         total_surfs += len(list(topo.faces()))
-
         #vol = brepgprop_VolumeProperties(occ_steps[l], occ_props, tolerance)
         #print(dir(occ_props), dir(occ_props.PrincipalProperties()), dir(occ_props.volume()), occ_props.Mass())
         #sur = brepgprop_SurfaceProperties(occ_steps[l], occ_props, tolerance)
         #print(vol, "Test", sur)
+
+    if (total_surfs > 200):
+        raise Exception("Skipping model {}, too many surfaces: {}".format(os.path.basename(model),total_surfs))
+    #print(total_surfs, "surfaces")
+
+    gmsh.open(model)
+    gmsh_edges = gmsh.model.getEntities(1)
+    gmsh_surfs = gmsh.model.getEntities(2)
+    gmsh_entities = gmsh.model.getEntities()
 
     # stats["#edges"] = total_edges
     # stats["#surfs"] = total_surfs
@@ -457,6 +454,8 @@ def mesh_model(model, max_size=1e-5, tolerance=1e-7, repair=False, terminal=1):
     if not total_surfs == len(gmsh_surfs):
         print("Skipping due to wrong SURFS", model)
         return
+
+    gmsh.model.mesh.generate(2)
 
     #print("Reading curvature")
     v_cnt = 1
@@ -561,8 +560,8 @@ def mesh_model(model, max_size=1e-5, tolerance=1e-7, repair=False, terminal=1):
             #print(curve.FirstParameter(), curve.LastParameter())
 
 
-    #print("Processing surfaces")
     gmsh_entities = gmsh.model.getEntities(2)
+    #print("Processing {} surfaces".format(len(gmsh_entities)))
     n_cnt = 1
     occ_offset = 0
     occ_cnt = 0
@@ -637,7 +636,7 @@ def mesh_model(model, max_size=1e-5, tolerance=1e-7, repair=False, terminal=1):
             #print(surf)
             g_type = gmsh_map[gmsh.model.getType(e[0], e[1])]
             if g_type != "Other" and not g_type == surf_map[surf.GetType()]:
-                print("Skipped due to non matching surfaces ", model, g_type, surf_map[surf.GetType()])
+                raise Exception("Skipped due to non matching surfaces ", model, g_type, surf_map[surf.GetType()])
                 #invalid_model = True
                 #break
 
