@@ -371,6 +371,25 @@ def mesh_model(model, max_size=1e-5, tolerance=1e-7, repair=False, terminal=1):
 
     # OCC definitions
     occ_steps = read_step_file(model)
+
+    total_edges = 0
+    total_surfs = 0
+
+    for l in range(len(occ_steps)):
+        topo = TopologyExplorer(occ_steps[l])
+        total_edges += len(list(topo.edges()))
+        total_surfs += len(list(topo.faces()))
+        # vol = brepgprop_VolumeProperties(occ_steps[l], occ_props, tolerance)
+        # print(dir(occ_props), dir(occ_props.PrincipalProperties()), dir(occ_props.volume()), occ_props.Mass())
+        # sur = brepgprop_SurfaceProperties(occ_steps[l], occ_props, tolerance)
+        # print(vol, "Test", sur)
+
+    if (total_surfs > 400):
+        print("Skipping model {}, too many surfaces: {}".format(os.path.basename(model), total_surfs))
+        return
+
+    #print(total_surfs, "surfaces")
+
     #stats["#parts"] = len(occ_steps)
     #stats["model"] = model
     #print("Reading step %s with %i parts."%(model,len(occ_steps)))
@@ -381,7 +400,7 @@ def mesh_model(model, max_size=1e-5, tolerance=1e-7, repair=False, terminal=1):
     #    print(len(list(occ_topo.edges())))
     #    tot += len(list(occ_topo.edges()))
     occ_cnt = 0
-    bbox =  get_boundingbox(occ_steps[occ_cnt], use_mesh=False)
+    bbox =  get_boundingbox(occ_steps[occ_cnt], use_mesh=True)
     diag = np.sqrt(bbox[6]**2+bbox[7]**2+bbox[8]**2)
     max_length = diag * max_size#, 9e-06
     tolerance = diag * tolerance
@@ -417,22 +436,6 @@ def mesh_model(model, max_size=1e-5, tolerance=1e-7, repair=False, terminal=1):
     gmsh.option.setNumber("Mesh.MeshSizeFromCurvature", 1)
     gmsh.option.setNumber("Mesh.MinimumElementsPerTwoPi",8)
     gmsh.option.setNumber("General.ExpertMode",1)
-
-    total_edges = 0
-    total_surfs = 0
-
-    for l in range(len(occ_steps)):
-        topo = TopologyExplorer(occ_steps[l])
-        total_edges += len(list(topo.edges()))
-        total_surfs += len(list(topo.faces()))
-        #vol = brepgprop_VolumeProperties(occ_steps[l], occ_props, tolerance)
-        #print(dir(occ_props), dir(occ_props.PrincipalProperties()), dir(occ_props.volume()), occ_props.Mass())
-        #sur = brepgprop_SurfaceProperties(occ_steps[l], occ_props, tolerance)
-        #print(vol, "Test", sur)
-
-    if (total_surfs > 200):
-        raise Exception("Skipping model {}, too many surfaces: {}".format(os.path.basename(model),total_surfs))
-    #print(total_surfs, "surfaces")
 
     gmsh.open(model)
     gmsh_edges = gmsh.model.getEntities(1)
@@ -636,7 +639,8 @@ def mesh_model(model, max_size=1e-5, tolerance=1e-7, repair=False, terminal=1):
             #print(surf)
             g_type = gmsh_map[gmsh.model.getType(e[0], e[1])]
             if g_type != "Other" and not g_type == surf_map[surf.GetType()]:
-                raise Exception("Skipped due to non matching surfaces ", model, g_type, surf_map[surf.GetType()])
+                print("Skipped due to non matching surfaces ", model, g_type, surf_map[surf.GetType()])
+                return
                 #invalid_model = True
                 #break
 

@@ -8,7 +8,13 @@ import yaml
 import bisect
 import gmsh
 import threading
-from multiprocessing import Process
+from multiprocessing import Process, current_process, active_children
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures.process import BrokenProcessPool
+import concurrent.futures
+import math
+import random
+#import psutil
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__),"../../..")))
 
@@ -67,6 +73,14 @@ def interpolateFactor(inv_factors, num_edges, target_edges):
     #print("Fallback to linear regression, factor", 1.0/factor)
     return factor
 
+def hasOnlyPlaneAndCylinderSurfs(mesh):
+    surfaces = mesh["features"]["surfaces"]
+    for surface in surfaces:
+        type = surface["type"]
+        if (type != "Plane" and type != "Cylinder"):
+            return False
+    return True
+
 init_mesh_size_error = 0.02
 
 def createMeshWithEdgeCount(stepPath, max_edges, meshSizeInitFactor):
@@ -83,12 +97,13 @@ def createMeshWithEdgeCount(stepPath, max_edges, meshSizeInitFactor):
     min_factor = 0.005
 
     while (num_iters < max_iters):
-        print("Trying with factor", current_factor)
+        #print("Trying with factor", current_factor)
         try:
             mesh = cadmesh.mesh_model(stepPath, max_size=current_factor, terminal=0)
         except Exception as error:
             gmsh.finalize()
-            raise error
+            os.remove(stepPath)
+            raise Exception("Deleting {} due to error: {}".format(stepPath,error))
         # face_count = getMeshFaceCount(mesh)
         # if (face_count == 0):
         #     # restart gmsh, sometimes it deadlocks
@@ -96,26 +111,35 @@ def createMeshWithEdgeCount(stepPath, max_edges, meshSizeInitFactor):
         #     geom.__exit__()
         #     geom.__enter__()
         #     continue
+        if (mesh == None):
+            os.remove(stepPath)
+            raise Exception("Deleting invalid model {}".format(os.path.basename(stepPath)))
+
+        if (hasOnlyPlaneAndCylinderSurfs(mesh)):
+            os.remove(stepPath)
+            raise Exception("Deleting {}, it only has plane and cylinder surfaces".format(os.path.basename(stepPath)))
+
         curr_num_edges = getEstMeshEdgeCount(mesh)
+
+        if (current_factor >= 1 and curr_num_edges > max_edges):
+            os.remove(stepPath)
+            raise Exception("Deleting unexpectedly large mesh size for mesh factor {}: {}".format(current_factor, curr_num_edges))
+
         edge_count = getExactMeshEdgeCount(mesh)
         if min_edges <= edge_count <= max_edges:
             print("Target edges MET with factor {}: {} [{},{}]".format(current_factor, curr_num_edges, min_edges, max_edges))
             #geom.save_geometry("test.msh")
             return mesh
-
-        if (current_factor >= 1 and curr_num_edges > max_edges):
-            raise Exception("Unexpectedly large mesh size for mesh factor {}: {}".format(current_factor, curr_num_edges))
-
-        print("Target edge count missed with factor {}: {} [{},{}]".format(current_factor, curr_num_edges,min_edges,max_edges))
-
         if (num_iters > init_iters_incr_error and curr_num_edges < max_edges):
             new_error_limit = (num_iters - init_iters_incr_error)/(max_iters-init_iters_incr_error)* (max_error - init_mesh_size_error)+ init_mesh_size_error
-            print("New error limit {}%".format(new_error_limit*100))
+            #print("New error limit {}%".format(new_error_limit*100))
             error = (max_edges - curr_num_edges) / max_edges
-            print("Current error {}%".format(error * 100))
+            #print("Current error {}%".format(error * 100))
             if (error <= new_error_limit):
                 print("Good enough approximation found with factor {}: {}, error {}%".format(current_factor, curr_num_edges, error * 100))
                 return mesh
+
+        #print("Target edge count missed with factor {}: {} [{},{}]".format(current_factor, curr_num_edges,min_edges,max_edges))
 
         if (num_iters+1 >= max_iters):
             break
@@ -127,9 +151,9 @@ def createMeshWithEdgeCount(stepPath, max_edges, meshSizeInitFactor):
         num_edges.insert(ins_idx, curr_num_edges)
 
         if (len(inv_factors) == 1):
-            current_factor = current_factor / 2
-            print("inv factors:", inv_factors)
-            print("num edges:", num_edges)
+            current_factor = current_factor / 2 if current_factor <= 1 else 1
+            #print("inv factors:", inv_factors)
+            #print("num edges:", num_edges)
         else:
             if (len(inv_factors) > 2):
                 if (num_edges[1] < target_edges):
@@ -147,13 +171,25 @@ def createMeshWithEdgeCount(stepPath, max_edges, meshSizeInitFactor):
                 # inv_factors = inv_factors[min_idx: max_idx]
                 # num_edges = num_edges[min_idx: max_idx]
 
-            print("inv factors:", inv_factors)
-            print("num edges:", num_edges)
+            #print("inv factors:", inv_factors)
+            #print("num edges:", num_edges)
             interpolatedFactor = interpolateFactor(inv_factors,num_edges,target_edges)
             current_factor = max(interpolatedFactor,min_factor) if interpolatedFactor != None else min_factor
         num_iters += 1
 
     raise Exception("Didn't converge to target edges in 20 iterations")
+
+def getStepPaths(datasetRoot):
+    stepDir = os.path.join(datasetRoot, "step")
+    if (not os.path.exists(stepDir)):
+        return None
+    stepPaths = []
+    for root, _, fnames in os.walk(stepDir):
+        for fname in fnames:
+            if (os.path.splitext(fname)[1] == ".step"):
+                stepPaths.append(os.path.join(root, fname))
+    return stepPaths
+
 
 def getObjLinks(datasetRoot):
     objLinkPaths = []
@@ -184,7 +220,6 @@ def createStepLinks(stepPaths,dstStepPath):
     return linkPaths
 
 def writeFeat(path, mesh):
-    print(path)
     with open(path, "w") as fili:
         yaml.dump(mesh["features"], fili, indent=2)
 
@@ -198,9 +233,9 @@ def writeObj(path, mesh):
         for f in faces:
             fili.write("f %i//%i %i//%i %i//%i\n" % (f[0], f[3], f[1], f[4], f[2], f[5]))
 
-def thread_function(stepLinks, meshSizeInitFactor):
+def workerFunc(stepLinks, meshSizeInitFactor, dstFeatPath, dstObjPath, targetEdges):
     for stepLink in stepLinks:
-        print("Remesh {}".format(stepLink))
+        print("{}: Remesh {}".format(current_process().name, stepLink))
         numberDir = os.path.basename(os.path.dirname(stepLink))
         stepFileName = os.path.basename(stepLink)
         featFileName = os.path.splitext(stepFileName.replace("_step_", "_features_"))[0] + ".yml"
@@ -208,19 +243,100 @@ def thread_function(stepLinks, meshSizeInitFactor):
         featPath = os.path.join(os.path.join(dstFeatPath, numberDir), featFileName)
         objPath = os.path.join(os.path.join(dstObjPath, numberDir), objFileName)
         if (os.path.exists(featPath) and os.path.exists(objPath)):
+            print("Skipping already existing mesh for", stepLink)
             continue
         try:
             mesh = createMeshWithEdgeCount(stepLink, targetEdges, meshSizeInitFactor)
         except Exception as error:
-            print("Cannot mesh model {}: {}".format(stepLink, error))
+            print("Cannot mesh model {}: {}".format(os.path.basename(stepLink), error))
             continue
+
         Path(os.path.dirname(featPath)).mkdir()
         Path(os.path.dirname(objPath)).mkdir()
         writeFeat(featPath, mesh)
         writeObj(objPath, mesh)
 
-if __name__ == '__main__':
+def getPendingModels(stepPaths, completedTaskIds, taskSize):
+    pendingStepPaths = []
+    completedTaskIds.sort()
+    firstTaskIdx = 0
+    for taskId in completedTaskIds:
+        lastTaskIdx = taskId*taskSize
+        for i in range(firstTaskIdx,lastTaskIdx):
+            stepPath = stepPaths[i]
+            if (os.path.exists(stepPath)):
+                pendingStepPaths.append(stepPath)
+        firstTaskIdx = lastTaskIdx+taskSize
+    for i in range(firstTaskIdx, len(stepPaths)):
+        stepPath = stepPaths[i]
+        if (os.path.exists(stepPath)):
+            pendingStepPaths.append(stepPath)
+    return pendingStepPaths
 
+def meshStepFilesInPool(stepPaths, numThreads, meshSizeInitFactor, dstFeatPath, dstObjPath, targetEdges, totalFilesDone):
+    finishedTasks = []
+    futureToTaskId = {}
+    numFiles = len(stepPaths)
+    taskSize = min(10, max(5, int(numFiles / 8000)))
+    timeoutSecs = taskSize * 20
+    taskCount = math.ceil(numFiles / taskSize)
+    print("Scheduling {} tasks of {} models each".format(taskCount, taskSize))
+
+    executor = ProcessPoolExecutor(max_workers=numThreads)
+
+    for i in range(0, numFiles, taskSize):
+        taskId = int(i / taskSize)
+        lastPath = min(numFiles, i + taskSize)
+        taskInput = stepPaths[i: lastPath]
+        # print("Task {} models [{},{}]".format(taskId, i, lastPath))
+        futureToTaskId[executor.submit(workerFunc, taskInput, meshSizeInitFactor,
+                                       dstFeatPath, dstObjPath, targetEdges)] = taskId
+
+    try:
+        workerIds = [child.pid for child in active_children()]
+        for workerId in workerIds:
+            print('Worker pid is {}'.format(workerId))
+
+        for future in as_completed(futureToTaskId, timeoutSecs):
+            taskId = futureToTaskId[future]
+            future.result()
+            print("Task {} finished".format(taskId))
+            finishedTasks.append(taskId)
+            totalFilesDone += taskSize
+            print("TOTAL FILES DONE: {}".format(totalFilesDone))
+    except Exception as error:
+        if isinstance(error, BrokenProcessPool):
+            print("Worker killed:", error)
+        elif isinstance(error,  concurrent.futures.TimeoutError):
+            print("Timeout:", error)
+        else:
+            print("Unknown error:", error)
+        print("Shutting down pool")
+        for future in futureToTaskId:
+            future.cancel()
+        executor.shutdown(wait=False)
+        for workerId in workerIds:
+            print('Killing worker {}'.format(workerId))
+            try:
+                os.kill(workerId, 9)
+            except Exception:
+                continue
+        print("Shutdown finished, reinit new Pool")
+        return getPendingModels(stepPaths, finishedTasks, taskSize), totalFilesDone
+
+    executor.shutdown(wait=True)
+    return [], totalFilesDone
+
+def meshStepFiles(stepPaths, numThreads, meshSizeInitFactor, dstFeatPath, dstObjPath, targetEdges):
+
+   stepPathsLeft = stepPaths
+   totalFilesDone = 0
+   while(len(stepPathsLeft) > 0):
+       random.shuffle(stepPathsLeft)
+       print("Models left: {}, done: {}".format(len(stepPathsLeft), totalFilesDone))
+       stepPathsLeft, totalFilesDone = meshStepFilesInPool(stepPathsLeft, numThreads, meshSizeInitFactor, dstFeatPath, dstObjPath, targetEdges, totalFilesDone)
+
+def main():
     parser = argparse.ArgumentParser("Remesh dataset of target edge count")
     parser.add_argument('--src', required=True, type=str, help="Path where source dataset is located")
     parser.add_argument('--dst', required=True, type=str, help="Path where dataset will be saved")
@@ -238,36 +354,21 @@ if __name__ == '__main__':
 
     print("Remesh dataset from {} to {} with #edges {}".format(srcPath,dstPath,targetEdges))
 
-    objPaths = list(map(lambda link: os.readlink(link),getObjLinks(srcPath)))
-    stepPaths = list(map(objPathToStepPath,objPaths))
+    stepPaths = getStepPaths(os.path.abspath(srcPath))
+    if (stepPaths == None):
+        objPaths = list(map(lambda link: os.readlink(link),getObjLinks(srcPath)))
+        stepPaths = list(map(objPathToStepPath,objPaths))
 
     dstObjPath = os.path.join(dstPath,"obj")
-    dstStepPath = os.path.join(dstPath,"step")
     dstFeatPath = os.path.join(dstPath,"feat")
     try:
         Path(dstObjPath).mkdir(parents=True, exist_ok=True)
-        Path(dstStepPath).mkdir(parents=True, exist_ok=True)
         Path(dstFeatPath).mkdir(parents=True, exist_ok=True)
     except FileExistsError as f_error:
         print(f_error)
         exit(1)
 
-    stepLinks =  createStepLinks(stepPaths, dstStepPath)
+    meshStepFiles(stepPaths, numThreads, meshSizeInitFactor, dstFeatPath, dstObjPath, targetEdges)
 
-
-    thLinkCount = int(len(stepLinks) / numThreads)
-
-    threads = []
-    for index in range(numThreads):
-        thListBegin = index*thLinkCount
-        thListEnd = len(stepLinks) if index == (numThreads-1) else thListBegin+thLinkCount
-        print("Process {} takes models [{},{}]".format(index,thListBegin,thListEnd))
-        thList = stepLinks[thListBegin:thListEnd]
-        th = Process(target=thread_function, args=(thList,meshSizeInitFactor))
-        threads.append(th)
-        th.start()
-
-    for th in threads:
-        th.join()
-
-
+if __name__ == '__main__':
+    main()
