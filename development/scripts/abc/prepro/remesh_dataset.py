@@ -8,13 +8,13 @@ import yaml
 import bisect
 import gmsh
 import threading
-from multiprocessing import Process, current_process, active_children
+from multiprocessing import current_process, active_children
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from concurrent.futures.process import BrokenProcessPool
-import concurrent.futures
 import math
 import random
-#import psutil
+import signal
+import resource
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__),"../../..")))
 
@@ -233,7 +233,21 @@ def writeObj(path, mesh):
         for f in faces:
             fili.write("f %i//%i %i//%i %i//%i\n" % (f[0], f[3], f[1], f[4], f[2], f[5]))
 
+workerTerminated = False
+
+def sigHandler(signum, frame):
+    global workerTerminated
+    print("Worker termination delayed while writing results")
+    workerTerminated = True
+
 def workerFunc(stepLinks, meshSizeInitFactor, dstFeatPath, dstObjPath, targetEdges):
+    global workerTerminated
+
+    memLimit = 4*2**30 # set max memory per worker to 4 GB
+    resource.setrlimit(resource.RLIMIT_DATA, (memLimit, memLimit))
+
+    origHandler = signal.getsignal(signal.SIGTERM)
+
     for stepLink in stepLinks:
         print("{}: Remesh {}".format(current_process().name, stepLink))
         numberDir = os.path.basename(os.path.dirname(stepLink))
@@ -251,10 +265,17 @@ def workerFunc(stepLinks, meshSizeInitFactor, dstFeatPath, dstObjPath, targetEdg
             print("Cannot mesh model {}: {}".format(os.path.basename(stepLink), error))
             continue
 
+        # Keep worker from getting killed while writing results
+        signal.signal(signal.SIGTERM, sigHandler)
+
         Path(os.path.dirname(featPath)).mkdir()
         Path(os.path.dirname(objPath)).mkdir()
         writeFeat(featPath, mesh)
         writeObj(objPath, mesh)
+
+        signal.signal(signal.SIGTERM,origHandler)
+        if (workerTerminated):
+            return
 
 def getPendingModels(stepPaths, completedTaskIds, taskSize):
     pendingStepPaths = []
@@ -273,11 +294,34 @@ def getPendingModels(stepPaths, completedTaskIds, taskSize):
             pendingStepPaths.append(stepPath)
     return pendingStepPaths
 
+
+watchdogRefreshed = True
+
+def killPoolWorkers(workerIds):
+    for workerId in workerIds:
+        print('Killing worker {}'.format(workerId))
+        try:
+            os.kill(workerId, signal.SIGTERM)
+        except Exception:
+            continue
+
+def tickWatchdog(timeoutSecs, workerIds):
+    global watchdogRefreshed
+
+    if watchdogRefreshed:
+        watchdogRefreshed = False
+        threading.Timer(timeoutSecs, tickWatchdog, args=(timeoutSecs, workerIds)).start()
+    else:
+        print("Timeout after {} secs, killing workers".format(timeoutSecs))
+        killPoolWorkers(workerIds)
+
 def meshStepFilesInPool(stepPaths, numThreads, meshSizeInitFactor, dstFeatPath, dstObjPath, targetEdges, totalFilesDone):
+    global watchdogRefreshed
+
     finishedTasks = []
     futureToTaskId = {}
     numFiles = len(stepPaths)
-    taskSize = min(10, max(5, int(numFiles / 8000)))
+    taskSize = 10 #min(10, max(5, int(numFiles / 8000)))
     timeoutSecs = taskSize * 20
     taskCount = math.ceil(numFiles / taskSize)
     print("Scheduling {} tasks of {} models each".format(taskCount, taskSize))
@@ -292,38 +336,39 @@ def meshStepFilesInPool(stepPaths, numThreads, meshSizeInitFactor, dstFeatPath, 
         futureToTaskId[executor.submit(workerFunc, taskInput, meshSizeInitFactor,
                                        dstFeatPath, dstObjPath, targetEdges)] = taskId
 
-    try:
-        workerIds = [child.pid for child in active_children()]
-        for workerId in workerIds:
-            print('Worker pid is {}'.format(workerId))
+    workerIds = [child.pid for child in active_children()]
+    for workerId in workerIds:
+        print('Worker pid is {}'.format(workerId))
 
-        for future in as_completed(futureToTaskId, timeoutSecs):
+    print("Setting timeout to {} seconds".format(timeoutSecs))
+    watchdogRefreshed = True
+    watchdog = threading.Timer(timeoutSecs, tickWatchdog, args=(timeoutSecs, workerIds))
+    watchdog.start()
+
+    try:
+        for future in as_completed(futureToTaskId):
             taskId = futureToTaskId[future]
             future.result()
+            watchdogRefreshed = True
             print("Task {} finished".format(taskId))
             finishedTasks.append(taskId)
             totalFilesDone += taskSize
             print("TOTAL FILES DONE: {}".format(totalFilesDone))
     except Exception as error:
-        if isinstance(error, BrokenProcessPool):
+        if (isinstance(error, BrokenProcessPool)):
             print("Worker killed:", error)
-        elif isinstance(error,  concurrent.futures.TimeoutError):
-            print("Timeout:", error)
         else:
             print("Unknown error:", error)
         print("Shutting down pool")
         for future in futureToTaskId:
             future.cancel()
+        watchdog.cancel()
         executor.shutdown(wait=False)
-        for workerId in workerIds:
-            print('Killing worker {}'.format(workerId))
-            try:
-                os.kill(workerId, 9)
-            except Exception:
-                continue
+        killPoolWorkers(workerIds)
         print("Shutdown finished, reinit new Pool")
         return getPendingModels(stepPaths, finishedTasks, taskSize), totalFilesDone
 
+    watchdog.cancel()
     executor.shutdown(wait=True)
     return [], totalFilesDone
 
