@@ -194,13 +194,12 @@ def polygonSelfIntersects(vertices):
                 return True
     return False
 
-def sample2DOutline(total_angle=None):
-    min_angle_offset = pi / 8
+def sample2DOutline(total_angle_range=(pi / 2, 2 * pi)):
+    min_angle_offset = pi / 12
     max_angle_offset = 3*pi/4
     max_point_count = 8
     point_count = random.uniform(3,max_point_count)
-    if (total_angle == None):
-        total_angle = random.uniform(pi / 2, 2 * pi)
+    total_angle = random.uniform(total_angle_range[0],total_angle_range[1])
     max_radius = random.random()
     min_radius = 0.5 * max_radius
     points = []
@@ -300,14 +299,14 @@ def createCylinders(geom, objDirPath, segDirPath, ssegDirPath, minEdges, maxEdge
                 break
         params = np.random.rand(3) * [1, 1, 2 * pi - min_angle] + [0, 0, min_angle]
 
-def createSphere(geom, azimuth, inclination, closeMesh):
+def createSphere(geom, azimuth, inclination, closeMesh, r=1.0):
     # azimuth [0,pi]
     # inclination [0,2*pi]
 
     # Can't use OCC's addSphere, plane surfaces cannot be removed later.
     center = geom.add_point([0, 0])
-    a_start = geom.add_point([1, 0])
-    a_end = geom.add_point([np.cos(azimuth), np.sin(azimuth)])
+    a_start = geom.add_point([r, 0])
+    a_end = geom.add_point([r*np.cos(azimuth), r*np.sin(azimuth)])
     azimuth_arc = geom.add_circle_arc(start=a_start, end=a_end, center=center)
     azimuth_surface = geom.add_plane_surface(
         geom.add_curve_loop([geom.add_line(center, a_start), azimuth_arc, geom.add_line(a_end, center)]))
@@ -364,7 +363,7 @@ def createCone(geom, radius0, height, radius1, angle, closeMesh):
         for i in range(1, len(surfaces)):
             geom.env.remove([surfaces[i]])  # remove all plane surfaces.
 
-    return [surfaces[0][1]]
+    return {surfaces[0][1]: surfaceTypes.index("Cone")}
 
 def createCones(geom, objDirPath, segDirPath, ssegDirPath, minEdges, maxEdges, count, closeMeshes):
     surfaceType = "Cone"
@@ -395,63 +394,76 @@ def createCones(geom, objDirPath, segDirPath, ssegDirPath, minEdges, maxEdges, c
                  + [0, min_height_factor*params[0], 0, min_angle]
 
 
-def createTorus(geom, orad, irad, angle, closeMesh):
+def createTorus(geom, orad, irad, angle, circleAngle, closeMesh):
     # irad = radius of extruded circle
     # orad = radius from x0 to circle center.
     # angle [0,2*pi], extrusion angle
-    p = [geom.add_point([orad, 0.0]),
-         geom.add_point([orad + irad, 0.0]),
-         geom.add_point([orad, irad]),
-         geom.add_point([orad - irad, 0.0]),
-         geom.add_point([orad, -irad])]
+    # circleAngle, circle arc angle
+    if (circleAngle < 2*pi):
+        p = [geom.add_point([orad, 0.0]),
+             geom.add_point([orad + irad, 0.0]),
+             geom.add_point([orad + irad*np.cos(circleAngle), irad*np.sin(circleAngle)])]
+    else:
+        p = [geom.add_point([orad, 0.0]),
+             geom.add_point([orad + irad, 0.0]),
+             geom.add_point([orad, irad]),
+             geom.add_point([orad - irad, 0.0]),
+             geom.add_point([orad, -irad])]
     arcs = []
     for k in range(1, len(p) - 1):
         arcs.append(geom.add_circle_arc(p[k], p[0], p[k + 1]))
-    arcs.append(geom.add_circle_arc(p[-1], p[0], p[1]))
+
+    if (circleAngle < 2*pi):
+        arcs.append(geom.add_line(p[-1], p[0]))
+        arcs.append(geom.add_line(p[0], p[1]))
+    else:
+        arcs.append(geom.add_circle_arc(p[-1], p[0], p[1]))
 
     plane_surface = geom.add_plane_surface(geom.add_curve_loop(arcs))
-    surfaces = revolve(geom, plane_surface, rot_axis=[0.0, 1.0, 0.0], rot_point=[0.0, 0.0, 0.0], angle=angle, closeMesh=closeMesh)
 
-    maxIdSurface = surfaces[0]
+    revolve(geom, plane_surface, rot_axis=[0.0, 1.0, 0.0], rot_point=[0.0, 0.0, 0.0], angle=angle, closeMesh=closeMesh)
 
-    if (angle < 2*pi):
-        for i in range(1,len(surfaces)):
-            surf = surfaces[i]
-            if (surf.id > maxIdSurface.id):
-                maxIdSurface = surf
-        if (not closeMesh):
-            geom.remove(maxIdSurface)
-
-    revSurfs = {}
     torusLabel = surfaceTypes.index("Torus")
-    for surf in surfaces:
-        if (angle >= 2*pi or surf.dim_tag[1] != maxIdSurface.id):
-            revSurfs[surf.dim_tag[1]] = torusLabel
-    return revSurfs
-
+    planeLabel = surfaceTypes.index("Plane")
+    coneLabel = surfaceTypes.index("Cone")
+    surfsTags = [surf[1] for surf in geom.env.getEntities(2)]
+    if (angle < 2 * pi):
+        if (not closeMesh):
+            geom.env.remove([(2, surfsTags[0])])
+            geom.env.remove([(2, surfsTags[-1])])
+        torusTags = surfsTags[2:-2]
+        surfDict = {surf: torusLabel for surf in torusTags}
+        surfDict[surfsTags[1]] = torusLabel
+        surfDict[surfsTags[2]] = coneLabel
+        surfDict[surfsTags[-2]] = planeLabel
+        return surfDict
+    else:
+        geom.env.remove([(2, surfsTags[0])])
+        return {surf: torusLabel for surf in surfsTags}
 
 def createTori(geom, objDirPath, segDirPath, ssegDirPath, minEdges, maxEdges, count, closeMeshes):
     surfaceType = "Torus"
     min_angle = pi / 20
+    min_circle_angle = pi / 4
     max_irad_factor = 0.8
-    params = [1, 0.25, 2 * pi]
+    params = [1, 0.25, 2 * pi, 2*pi]
     for i in range(count):
         name = getSampleName(surfaceType, i)
         objPath = os.path.join(objDirPath, name + ".obj")
 
         while True:
-            print("Create {} with orad {}, irad {}, angle {}".format(name, params[0], params[1], params[2]))
+            print("Create {} with orad {}, irad {}, angle {}, circle angle {}".format(name, params[0], params[1], params[2], params[3]))
             try:
                 createMeshWithEdgeCount(minEdges, maxEdges, objPath, name, segDirPath, ssegDirPath,
                                         createTorus, geom, *params, closeMeshes)
             except Exception as error:
                 print("Meshing error:", error)
-                params = np.random.rand(3)
-                params = params * [1, params[0] * max_irad_factor, 2 * pi - min_angle] + [0, 0, min_angle]
+                params = np.random.rand(4)
+                params = params * [1, params[0] * max_irad_factor, 2 * pi - min_angle,2 * pi - min_circle_angle] + [0, 0, min_angle, min_circle_angle]
             else:
                 break
-        params = np.random.rand(3)
-        params = params * [1, params[0] * max_irad_factor, 2 * pi - min_angle] + [0, 0, min_angle]
+        params = np.random.rand(4)
+        params = params * [1, params[0] * max_irad_factor, 2 * pi - min_angle,2 * pi - min_circle_angle] + [0, 0, min_angle, min_circle_angle]
 
 
 def extrude(geom, input_surface, length, closeMesh):
@@ -461,7 +473,8 @@ def extrude(geom, input_surface, length, closeMesh):
         geom.remove(input_surface)  # remove bottom
         geom.remove(surfaces[0])  # remove top
 
-    return [ surf.dim_tag[1] for surf in surfaces[2]]
+    extrusionLabel = surfaceTypes.index("Extrusion")
+    return {surf.dim_tag[1]: extrusionLabel  for surf in surfaces[2]}
 
 def createExtrusionSurface(geom, points, length, closeMesh):
     # So far extrude only bspline surfaces.
@@ -488,38 +501,29 @@ def createExtrusionSurfaces(geom, objDirPath, segDirPath, ssegDirPath, minEdges,
                 break
 
 def revolve(geom, input_surface, rot_axis=[1.0, 0.0, 0.0], rot_point=[0.0, 0.0, 0.0], angle=2 * pi, closeMesh=True):
-    # recombine: bool = False,
-    surfaces = geom._revolve(input_surface, rot_axis, rot_point, angle)
-    volume = geom.env.getEntities(3)
-    geom.env.remove(volume)
-
-    if (not closeMesh or angle == 2*pi):
-        geom.remove(input_surface)  # remove one end
-
-    all_surfaces = surfaces[2][:]
-    if (surfaces[0].dim == 2):
-        all_surfaces.append(surfaces[0])
-    if (surfaces[1].dim == 2):
-        all_surfaces.append(surfaces[1])
-
-    return all_surfaces
-
-def revolve_geo(geom, input_surface, rot_axis=[1.0, 0.0, 0.0], rot_point=[0.0, 0.0, 0.0], angle=2*pi, closeMesh=True):
-    # recombine: bool = False,
-    angle = -pi
-    surfaces = geom._revolve(input_surface, rot_axis, rot_point, angle)
-    if (not closeMesh):
-        geom.remove(surfaces[1], False)  # remove volume (must be done first!)
-        #geom.remove(input_surface)  # remove one end
-        #if (surfaces[0].dim_tag[1] != input_surface.dim_tag[1]):
-        #    geom.remove(surfaces[0])  # remove the other end
+    geom._revolve(input_surface, rot_axis, rot_point, angle)
+    geom.env.remove(geom.env.getEntities(3))
 
 def createRevolutionSurface(geom, points, surface_type, angle=2 * pi, rot_axis=[1.0, 0.0, 0.0], rot_point=[0.0, 0.0, 0.0], closeMesh=True):
     if (surface_type == "polygon"):
         surface = geom.add_polygon(points)
     else:
         surface = createPlaneSurfaceFromBSpline(geom, points)
-    return revolve(geom, surface, rot_axis, rot_point, angle, closeMesh)
+    revolve(geom, surface, rot_axis, rot_point, angle, closeMesh)
+
+    revLabel = surfaceTypes.index("Revolution")
+
+    revSurfs = [surf[1] for surf in geom.env.getEntities(2)]
+
+    if (angle < 2*pi):
+        if (not closeMesh):
+            geom.env.remove([(2, revSurfs[0])])
+            geom.env.remove([(2, revSurfs[-1])])
+        revSurfs = revSurfs[1:-1]
+    else:
+        geom.env.remove([(2, revSurfs[0])])
+
+    return { revSurf : revLabel for revSurf in revSurfs}
 
 def createRevolutionSurfaces(geom, objDirPath, segDirPath, ssegDirPath, minEdges, maxEdges, count, closeMeshes):
     surfaceType = "Revolution"
@@ -531,7 +535,7 @@ def createRevolutionSurfaces(geom, objDirPath, segDirPath, ssegDirPath, minEdges
 
         while(True):
             # meshing fails sometimes (intersections?, too small areas?), retry until it succeeds.
-            points = sample2DOutline(pi)
+            points = sample2DOutline((pi/4,pi))
             print("Create {} with {} of {} points, angle {}".format(name, generator_types[i%2],len(points), angle))
             try:
                 createMeshWithEdgeCount(minEdges, maxEdges, objPath, name, segDirPath, ssegDirPath,
@@ -557,7 +561,12 @@ def createBSplineSurface(geom, r, azimuth, inclination, num_divs_az, num_divs_in
             points.append(p)
             az += az_step
         inc += inc_step
-    return [geom.env.addBSplineSurface(point_tags, num_divs_az+1)] # -1, 4,4
+    bsplineType = surfaceTypes.index("BSpline")
+    bsplineTag = geom.env.addBSplineSurface(point_tags, num_divs_az+1)
+    createSphere(geom,azimuth,inclination,closeMesh,r)
+    #geom.env.fuse([(2,bsplineTag)])
+    #geom.env.extrude([(2,bsplineTag)],0.0, 0.0, 1.0)
+    return {bsplineTag: bsplineType}
 
 def createBSplineSurfaces(geom, objDirPath, segDirPath, ssegDirPath, minEdges, maxEdges, count, closeMeshes):
     surfaceType = "BSpline"
@@ -643,12 +652,15 @@ with pygmsh.occ.Geometry() as geom:
     # gmsh.option.setNumber("General.Terminal", 1)
     gmsh.option.setNumber("Mesh.AlgorithmSwitchOnFailure", 0) # Fallback to Mesh-Adapt ends hanging up sometimes.
     #createPlaneSurfaces(geom, objPath, segPath, ssegPath, minEdges, maxEdges, numSurfaceSamples, closeMeshes)
-    #createSpheres(geom, objPath,segPath,ssegPath,minEdges,maxEdges,numSurfaceSamples, closeMeshes)
+    # createSpheres(geom, objPath,segPath,ssegPath,minEdges,maxEdges,numSurfaceSamples, closeMeshes)
     # createCones(geom, objPath,segPath,ssegPath,minEdges,maxEdges,numSurfaceSamples, closeMeshes)
-    createTori(geom, objPath,segPath,ssegPath,minEdges,maxEdges,numSurfaceSamples, closeMeshes)
-    # createBSplineSurfaces(geom, objPath, segPath, ssegPath, minEdges, maxEdges, numSurfaceSamples, closeMeshes)
-    #createRevolutionSurfaces(geom, objPath, segPath, ssegPath, minEdges, maxEdges, numSurfaceSamples, closeMeshes)
     # createExtrusionSurfaces(geom, objPath, segPath, ssegPath, minEdges, maxEdges, numSurfaceSamples, closeMeshes)
+    # createRevolutionSurfaces(geom, objPath, segPath, ssegPath, minEdges, maxEdges, numSurfaceSamples, closeMeshes)
+
+    createTori(geom, objPath,segPath,ssegPath,minEdges,maxEdges,numSurfaceSamples, closeMeshes)
+    #createBSplineSurfaces(geom, objPath, segPath, ssegPath, minEdges, maxEdges, numSurfaceSamples, closeMeshes)
+
+
 
 
 

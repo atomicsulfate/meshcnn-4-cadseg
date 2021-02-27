@@ -81,7 +81,7 @@ def hasOnlyPlaneAndCylinderSurfs(mesh):
             return False
     return True
 
-init_mesh_size_error = 0.02
+init_mesh_size_error = 0.005
 
 def createMeshWithEdgeCount(stepPath, max_edges, meshSizeInitFactor):
     # Fit the function 1/mesh_size_factor -> mesh edges to a quadratic polynomial.
@@ -91,9 +91,9 @@ def createMeshWithEdgeCount(stepPath, max_edges, meshSizeInitFactor):
     min_edges = max_edges*(1-init_mesh_size_error)
     target_edges = round(min_edges + (max_edges - min_edges) * 0.5)
     num_iters = 0
-    max_iters = 10
-    max_error = 0.08
-    init_iters_incr_error = 3
+    max_iters = 20
+    max_error = 0.02
+    init_iters_incr_error = 10
     min_factor = 0.005
 
     while (num_iters < max_iters):

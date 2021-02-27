@@ -5,6 +5,8 @@ import argparse
 import math
 import numpy as np
 import random
+import pymesh
+
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__),"../../..")))
 
 from meshcnn.models.layers.mesh_prepare import fill_from_file,remove_non_manifolds, build_gemm
@@ -55,7 +57,7 @@ def takeMesh(objPath,minEdges,maxEdges):
         print("Skip non-manifold mesh:", objPath)
         return False
 
-    if (mesh.edges_count >=minEdges and mesh.edges_count <=maxEdges):
+    if (mesh.edges_count >=minEdges and mesh.edges_count <=maxEdges and pymesh.load_mesh(objPath).is_closed()):
         print("Adding {} with {} faces and {} edges, edgeFaceRatio {}".format(objPath,mesh.faces_count,mesh.edges_count,
                                                                               mesh.edges_count/ mesh.faces_count))
         return True
@@ -92,6 +94,7 @@ parser.add_argument('--maxEdges', type=int, default=math.inf, help="Max number o
 parser.add_argument('--maxSamples', type=int, default=math.inf, help="Max dataset size")
 parser.add_argument('--testTrainRatio', type=float, default=0.2, help="#test samples/#train samples")
 parser.add_argument('--excludeNonManifolds', action='store_true', help="Exclude meshes that are not manifolds")
+parser.add_argument('--excludeOpenMeshes', action='store_true', help="Exclude open meshes")
 
 args = parser.parse_args()
 
@@ -113,8 +116,8 @@ dstTrainPath = os.path.join(dstPath,"train")
 dstTestPath = os.path.join(dstPath,"test")
 
 try:
-    Path(dstTrainPath).mkdir(parents=True, exist_ok=False)
-    Path(dstTestPath).mkdir(parents=True, exist_ok=False)
+    Path(dstTrainPath).mkdir(parents=True, exist_ok=True)
+    Path(dstTestPath).mkdir(parents=True, exist_ok=True)
 except FileExistsError as f_error:
     print(f_error)
     exit(1)
