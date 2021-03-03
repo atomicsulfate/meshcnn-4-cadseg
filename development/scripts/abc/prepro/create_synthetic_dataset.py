@@ -139,7 +139,6 @@ def createMeshWithEdgeCount(min_edges, max_edges, objPath, name, segDirPath, sse
     while (num_iters < max_iters):
         gmsh.clear()
         gmsh.model.mesh.clear()
-        #gmsh.model.mesh.getNodes()
         #print("Trying with factor", current_factor)
         gmsh.option.setNumber("Mesh.MeshSizeFactor", current_factor)
         surfaces = surface_func(geom, *args,**kwargs)
@@ -156,8 +155,8 @@ def createMeshWithEdgeCount(min_edges, max_edges, objPath, name, segDirPath, sse
         if min_edges <= mesh.meshData.edges_count <= max_edges:
             #print("Target edges MET with factor {}: {} [{},{}]".format(current_factor, curr_num_edges, min_edges, max_edges))
             #geom.save_geometry("test.msh")
-            #saveMesh(objPath, mesh)
-            #createSegFiles(mesh.meshData, surfaces, name, segDirPath, ssegDirPath)
+            saveMesh(objPath, mesh)
+            createSegFiles(mesh.meshData, surfaces, name, segDirPath, ssegDirPath)
             return
 
         if (len(num_edges) == 0 and curr_num_edges > max_edges):
@@ -309,19 +308,21 @@ def createCylinders(geom, objDirPath, segDirPath, ssegDirPath, minEdges, maxEdge
                 break
         params = np.random.rand(3) * [1, 1, 2 * pi - min_angle] + [0, 0, min_angle]
 
-def createSphere(geom, azimuth, inclination, closeMesh, r=1.0, removeVol=True):
+defMeshSize = 1
+
+def createSphere(geom, azimuth, inclination, closeMesh, r=1.0):
     # azimuth [0,pi]
     # inclination [0,2*pi]
 
     # Can't use OCC's addSphere, plane surfaces cannot be removed later.
-    center = geom.add_point([0, 0])
-    a_start = geom.add_point([0, 0, r])
-    a_end = geom.add_point([r*np.sin(azimuth), 0, r*np.cos(azimuth)])
+    center = geom.add_point([0, 0], mesh_size=defMeshSize)
+    a_start = geom.add_point([r, 0, 0], mesh_size=defMeshSize)
+    a_end = geom.add_point([r*np.cos(azimuth), 0, r*np.sin(azimuth)],mesh_size=defMeshSize)
     azimuth_arc = geom.add_circle_arc(start=a_start, end=a_end, center=center)
     azimuth_surface = geom.add_plane_surface(
         geom.add_curve_loop([geom.add_line(center, a_start), azimuth_arc, geom.add_line(a_end, center)]))
 
-    surfaces = geom._revolve(azimuth_surface, rotation_axis=[0.0, 0.0, 1.0], point_on_axis=[0.0, 0.0, 0.0],
+    surfaces = geom._revolve(azimuth_surface, rotation_axis=[-1.0, 0.0, 0.0], point_on_axis=[0.0, 0.0, 0.0],
                              angle=inclination)
 
     geom.remove(surfaces[1], False)  # remove volume (must be done first!)
@@ -573,9 +574,7 @@ def createRevolutionSurfaces(geom, objDirPath, segDirPath, ssegDirPath, minEdges
         angle = random.uniform(pi / 8, 2 * pi)
 
 def createBSplineSurface(geom, r, azimuth, inclination, num_divs_az, num_divs_inc, ctrl_point_heights, closeMesh):
-
-    #sphereId = geom.env.addSphere(0,0,0,5*r/4)
-    azimuth = pi/2
+    azimuth = pi
     inclination = pi/2
 
     tmpSurfaces = []
@@ -599,9 +598,9 @@ def createBSplineSurface(geom, r, azimuth, inclination, num_divs_az, num_divs_in
         for j in range(num_divs_az+1):
             radius = r
             # Do not displace control points at the boundary so that later bspline surface can be sewed to the whole volume.
-            if (i != 0 and i!= num_divs_inc and j != 0 and j != num_divs_az and (i % 3) == 0 and (j % 3) == 0):
+            if (i != 0 and i!= num_divs_inc and j != 0 and j != num_divs_az): # and (i % 2) == 0 and (j % 2) == 0):
                 radius += ctrl_point_heights[i*(num_divs_az+1)+j]
-            p =geom.add_point([radius*np.sin(inc)*np.cos(az), radius*np.sin(inc)*np.sin(az), radius*np.cos(inc)])
+            p =geom.add_point([radius*np.sin(inc)*np.cos(az), radius*np.sin(inc)*np.sin(az), radius*np.cos(inc)], mesh_size=defMeshSize/100)
             point_tags.append(p._id)
             az += az_step
         inc += inc_step
@@ -627,6 +626,7 @@ def createBSplineSurface(geom, r, azimuth, inclination, num_divs_az, num_divs_in
             finalSurfaces.append(ent[1])
         else:
             break
+
     if (not volumeCreated):
         raise Exception("BSpline surface could not be closed")
 
@@ -640,7 +640,7 @@ def createBSplineSurface(geom, r, azimuth, inclination, num_divs_az, num_divs_in
 
 def createBSplineSurfaces(geom, objDirPath, segDirPath, ssegDirPath, minEdges, maxEdges, count, closeMeshes):
     surfaceType = "BSpline"
-    min_angle = pi / 20
+    min_angle = pi/2
 
     for i in range(count):
         name = getSampleName(surfaceType, i)
@@ -654,12 +654,6 @@ def createBSplineSurfaces(geom, objDirPath, segDirPath, ssegDirPath, minEdges, m
             num_divs_az = round(np.random.uniform(10, 10))
             num_ctrl_points = (num_divs_inc+1)*(num_divs_az+1)
             ctrl_point_heights = np.random.default_rng().random(num_ctrl_points) * radius/2 - radius/4
-            # for i in range(num_ctrl_points):
-            #     min_height = -radius/2
-            #     max_height = radius/2
-            #     if (i>0):
-            #         min_height = max(min_height, ctrl_point_heights[-1]*)
-            #     np.random.uniform()
 
             print("Create {} of {}x{} ctrl points around sphere patch with angles {}, {}, radius {}"
                   .format(name, num_divs_az+1, num_divs_inc+1, inclination,azimuth, radius))
