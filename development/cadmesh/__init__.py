@@ -384,7 +384,7 @@ def mesh_model(model, max_size=1e-5, tolerance=1e-7, repair=False, terminal=1):
         # sur = brepgprop_SurfaceProperties(occ_steps[l], occ_props, tolerance)
         # print(vol, "Test", sur)
 
-    if (total_surfs > 400):
+    if (total_surfs > 300):
         print("Skipping model {}, too many surfaces: {}".format(os.path.basename(model), total_surfs))
         return
 
