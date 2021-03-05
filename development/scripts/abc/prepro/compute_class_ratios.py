@@ -17,13 +17,22 @@ def parseYamlFile(featPath):
             print(exc)
     return data
 
-def getSurfaceTypeFaceCount(featPath):
-    featData = parseYamlFile(featPath)
-    surfaceTypeFaceCount = np.zeros(len(surfaceTypes), dtype=int)
-    for surface in featData['surfaces']:
-        surfaceId = surfaceTypes.index(surface['type'])
-        surfaceTypeFaceCount[surfaceId] += len(surface['face_indices'])
-    return surfaceTypeFaceCount
+def getSurfaceTypeFaceCount(sourcePath):
+    surfaceTypeCount = np.zeros(len(surfaceTypes), dtype=int)
+
+    if (os.path.splitext(sourcePath)[1] == ".feat"):
+        featData = parseYamlFile(sourcePath)
+        for surface in featData['surfaces']:
+            surfaceId = surfaceTypes.index(surface['type'])
+            surfaceTypeCount[surfaceId] += len(surface['face_indices'])
+    else:
+        assert os.path.splitext(sourcePath)[1] == ".eseg"
+        segLabels = np.loadtxt(open(sourcePath, 'r'), dtype='int')
+        (uniqueSurfTypes, counts) = np.unique(segLabels, return_counts=True)
+        for i in range(len(uniqueSurfTypes)):
+            surfaceTypeCount[uniqueSurfTypes[i]] += counts[i]
+
+    return surfaceTypeCount
 
 def getTargetDatasetRoot(links):
     assert(len(links) > 0)
@@ -37,7 +46,16 @@ def objPathToFeatPath(objPath):
     globalObjPath, sampleId = os.path.split(pathToObjDir)
     datasetPath = os.path.split(globalObjPath)[0]
     featDirPath = os.path.join(datasetPath,"feat",sampleId)
+    if (not os.path.exists(featDirPath)):
+        return None
     return os.path.join(featDirPath, next(os.walk(featDirPath))[2][0])
+
+def objPathToSegPath(objPath):
+    segFName = os.path.splitext(os.path.basename(objPath))[0] + ".eseg"
+    datasetPath = os.path.split(os.path.split(objPath)[0])[0]
+    segPath = os.path.join(datasetPath,"seg",segFName)
+    assert os.path.exists(segPath), "Seg file {} does not exist".format(segPath)
+    return segPath
 
 def getObjLinks(datasetRoot):
     objLinkPaths = []
@@ -59,32 +77,30 @@ if (len(objLinks) == 0):
     print("No obj files found in", datasetRoot)
     exit(1)
 
-targetDatasetRoot = getTargetDatasetRoot(objLinks)
+#targetDatasetRoot = getTargetDatasetRoot(objLinks)
 
-print("Computing surface type ratios in {} (targets in {}) for {} obj files".format(datasetRoot, targetDatasetRoot, len(objLinks)))
+print("Computing surface type ratios in {} for {} obj files".format(datasetRoot, len(objLinks)))
 
 header = " ".join(x.center(10) for x in surfaceTypes)
 print("\t\t\t\t\t\t    " + header)
 
-objLinks.sort()
-objFileTargets = list(map(lambda link: os.readlink(link),objLinks))
-featFilePaths = list(map(objPathToFeatPath,objFileTargets))
+#objLinks.sort()
 
-totalSurfaceTypeFaceCount = np.zeros(len(surfaceTypes), dtype=int)
+totalSurfaceTypeCount = np.zeros(len(surfaceTypes), dtype=int)
 
 i = 0
 for objLink in objLinks:
-    objPath = os.readlink(objLink)
-    featFilePath = objPathToFeatPath(objPath)
-    surfaceTypeFaceCount = getSurfaceTypeFaceCount(featFilePath)
-    totalSurfaceTypeFaceCount += surfaceTypeFaceCount
-    print("{} {}".format(os.path.basename(objPath), " ".join(str(x).center(10) for x in surfaceTypeFaceCount)))
+    #objPath = os.readlink(objLink) if os.path.islink(objLink) else objLink
+    #featFilePath = objPathToFeatPath(objPath)
+    surfaceTypeCount = getSurfaceTypeFaceCount(objPathToSegPath(objLink))
+    totalSurfaceTypeCount += surfaceTypeCount
+    print("{:50} {}".format(os.path.basename(objLink), " ".join(str(x).center(10) for x in surfaceTypeCount)))
     i += 1
     if (i % 20 == 0):
-        avgSurfaceTypeFaceCount = totalSurfaceTypeFaceCount * 100 / totalSurfaceTypeFaceCount.sum()
+        avgSurfaceTypeFaceCount = totalSurfaceTypeCount * 100 / totalSurfaceTypeCount.sum()
         print("Totals after {} samples:\t\t\t\t{}".format(i, " ".join("{:10.2f}".format(x) for x in avgSurfaceTypeFaceCount)),file=sys.stderr)
 
-avgSurfaceTypeFaceCount = totalSurfaceTypeFaceCount * 100 / totalSurfaceTypeFaceCount.sum()
+avgSurfaceTypeFaceCount = totalSurfaceTypeCount * 100 / totalSurfaceTypeCount.sum()
 print("\t\t" + header)
 print("Totals: {}".format(" ".join("{:10.4f}".format(x) for x in avgSurfaceTypeFaceCount)))
 

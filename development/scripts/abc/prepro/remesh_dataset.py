@@ -15,6 +15,7 @@ import math
 import random
 import signal
 import resource
+import traceback
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__),"../../..")))
 
@@ -91,7 +92,7 @@ def createMeshWithEdgeCount(stepPath, max_edges, meshSizeInitFactor):
     min_edges = max_edges*(1-init_mesh_size_error)
     target_edges = round(min_edges + (max_edges - min_edges) * 0.5)
     num_iters = 0
-    max_iters = 20
+    max_iters = 40
     max_error = 0.02
     init_iters_incr_error = 10
     min_factor = 0.005
@@ -101,7 +102,10 @@ def createMeshWithEdgeCount(stepPath, max_edges, meshSizeInitFactor):
         try:
             mesh = cadmesh.mesh_model(stepPath, max_size=current_factor, terminal=0)
         except Exception as error:
-            gmsh.finalize()
+            try:
+                gmsh.finalize()
+            except Exception as error:
+                print(error)
             os.remove(stepPath)
             raise Exception("Deleting {} due to error: {}".format(stepPath,error))
         # face_count = getMeshFaceCount(mesh)
@@ -125,11 +129,16 @@ def createMeshWithEdgeCount(stepPath, max_edges, meshSizeInitFactor):
             os.remove(stepPath)
             raise Exception("Deleting unexpectedly large mesh size for mesh factor {}: {}".format(current_factor, curr_num_edges))
 
-        edge_count = getExactMeshEdgeCount(mesh)
-        if min_edges <= edge_count <= max_edges:
-            print("Target edges MET with factor {}: {} [{},{}]".format(current_factor, curr_num_edges, min_edges, max_edges))
-            #geom.save_geometry("test.msh")
-            return mesh
+        try:
+            edge_count = getExactMeshEdgeCount(mesh)
+        except Exception as error:
+            #os.remove(stepPath)
+            print("{} non-manifold? ({})".format(os.path.basename(stepPath),error))
+        else:
+            if min_edges <= edge_count <= max_edges:
+                print("Target edges MET with factor {}: {} [{},{}]".format(current_factor, curr_num_edges, min_edges, max_edges))
+                #geom.save_geometry("test.msh")
+                return mesh
         if (num_iters > init_iters_incr_error and curr_num_edges < max_edges):
             new_error_limit = (num_iters - init_iters_incr_error)/(max_iters-init_iters_incr_error)* (max_error - init_mesh_size_error)+ init_mesh_size_error
             #print("New error limit {}%".format(new_error_limit*100))
@@ -177,7 +186,7 @@ def createMeshWithEdgeCount(stepPath, max_edges, meshSizeInitFactor):
             current_factor = max(interpolatedFactor,min_factor) if interpolatedFactor != None else min_factor
         num_iters += 1
 
-    raise Exception("Didn't converge to target edges in 20 iterations")
+    raise Exception("Didn't converge to target edges in {} iterations".format(max_iters))
 
 def getStepPaths(datasetRoot):
     stepDir = os.path.join(datasetRoot, "step")
@@ -189,7 +198,6 @@ def getStepPaths(datasetRoot):
             if (os.path.splitext(fname)[1] == ".step"):
                 stepPaths.append(os.path.join(root, fname))
     return stepPaths
-
 
 def getObjLinks(datasetRoot):
     objLinkPaths = []
@@ -233,6 +241,15 @@ def writeObj(path, mesh):
         for f in faces:
             fili.write("f %i//%i %i//%i %i//%i\n" % (f[0], f[3], f[1], f[4], f[2], f[5]))
 
+def parseYamlFile(featPath):
+    data = None
+    with open(featPath, 'r') as stream:
+        try:
+            data = yaml.safe_load(stream)
+        except yaml.YAMLError as exc:
+            print(exc)
+    return data
+
 workerTerminated = False
 
 def sigHandler(signum, frame):
@@ -256,13 +273,16 @@ def workerFunc(stepLinks, meshSizeInitFactor, dstFeatPath, dstObjPath, targetEdg
         objFileName = os.path.splitext(stepFileName.replace("_step_", "_trimesh_"))[0] + ".obj"
         featPath = os.path.join(os.path.join(dstFeatPath, numberDir), featFileName)
         objPath = os.path.join(os.path.join(dstObjPath, numberDir), objFileName)
+
         if (os.path.exists(featPath) and os.path.exists(objPath)):
             print("Skipping already existing mesh for", stepLink)
             continue
+
         try:
             mesh = createMeshWithEdgeCount(stepLink, targetEdges, meshSizeInitFactor)
         except Exception as error:
             print("Cannot mesh model {}: {}".format(os.path.basename(stepLink), error))
+            #print(traceback.print_exc())
             continue
 
         # Keep worker from getting killed while writing results
@@ -322,7 +342,7 @@ def meshStepFilesInPool(stepPaths, numThreads, meshSizeInitFactor, dstFeatPath, 
     futureToTaskId = {}
     numFiles = len(stepPaths)
     taskSize = 10 #min(10, max(5, int(numFiles / 8000)))
-    timeoutSecs = taskSize * 20
+    timeoutSecs = taskSize * 40
     taskCount = math.ceil(numFiles / taskSize)
     print("Scheduling {} tasks of {} models each".format(taskCount, taskSize))
 
@@ -333,8 +353,7 @@ def meshStepFilesInPool(stepPaths, numThreads, meshSizeInitFactor, dstFeatPath, 
         lastPath = min(numFiles, i + taskSize)
         taskInput = stepPaths[i: lastPath]
         # print("Task {} models [{},{}]".format(taskId, i, lastPath))
-        futureToTaskId[executor.submit(workerFunc, taskInput, meshSizeInitFactor,
-                                       dstFeatPath, dstObjPath, targetEdges)] = taskId
+        futureToTaskId[executor.submit(workerFunc, taskInput, meshSizeInitFactor, dstFeatPath, dstObjPath, targetEdges)] = taskId
 
     workerIds = [child.pid for child in active_children()]
     for workerId in workerIds:
@@ -379,7 +398,60 @@ def meshStepFiles(stepPaths, numThreads, meshSizeInitFactor, dstFeatPath, dstObj
    while(len(stepPathsLeft) > 0):
        random.shuffle(stepPathsLeft)
        print("Models left: {}, done: {}".format(len(stepPathsLeft), totalFilesDone))
-       stepPathsLeft, totalFilesDone = meshStepFilesInPool(stepPathsLeft, numThreads, meshSizeInitFactor, dstFeatPath, dstObjPath, targetEdges, totalFilesDone)
+       stepPathsLeft, totalFilesDone = meshStepFilesInPool(stepPathsLeft, numThreads, meshSizeInitFactor,
+                                                           dstFeatPath, dstObjPath, targetEdges, totalFilesDone)
+
+def skipModel(statPath, maxFaceCount, maxSurfCount):
+    stats = parseYamlFile(statPath)
+    if (stats == None):
+        return False
+
+    faceCount = stats['#faces']
+    surfCount = stats['#surfs']
+
+    if (faceCount > maxFaceCount or surfCount > maxSurfCount):
+        print("Model {} is too large: #faces {} (max {}), #surfs {} (max {})".format(os.path.basename(statPath),
+                                                                                     faceCount, maxFaceCount, surfCount,
+                                                                                     maxSurfCount))
+        return True
+
+    surfs = stats['surfs']
+    surfTypeCounts = {surfType : 0 for surfType in surfaceTypes}
+    for surf in surfs:
+        surfTypeCounts[surf] = surfTypeCounts[surf] + 1
+    if (surfTypeCounts['Plane'] + surfTypeCounts['Cylinder'] == len(surfs)):
+        print("Model {} has only planes and cylinders".format(os.path.basename(statPath)))
+        return True
+    return False
+
+def filterModels(stepPaths, statDir, maxFaceCount, maxSurfCount, dstFeatPath, dstObjPath,):
+    filteredStepPaths = []
+    for stepPath in stepPaths:
+        stepFileName = os.path.basename(stepPath)
+        stepFileNumber = stepFileName.split("_")[0]
+        statPath = os.path.join(statDir, os.path.join(stepFileNumber,
+                                                      os.path.splitext(stepFileName.replace("_step_", "_stats_"))[
+                                                          0] + ".yml"))
+        if (not os.path.exists(statPath)):
+            continue
+
+        numberDir = os.path.basename(os.path.dirname(stepPath))
+        stepFileName = os.path.basename(stepPath)
+        featFileName = os.path.splitext(stepFileName.replace("_step_", "_features_"))[0] + ".yml"
+        objFileName = os.path.splitext(stepFileName.replace("_step_", "_trimesh_"))[0] + ".obj"
+        featPath = os.path.join(os.path.join(dstFeatPath, numberDir), featFileName)
+        objPath = os.path.join(os.path.join(dstObjPath, numberDir), objFileName)
+
+        if (os.path.exists(featPath) and os.path.exists(objPath)):
+            #print("Step {} already meshed".format(stepPath))
+            continue
+
+        filteredStepPaths.append(stepPath)
+        # if (skipModel(statPath,maxFaceCount,maxSurfCount)):
+        #     os.remove(stepPath)
+        # else:
+        #     filteredStepPaths.append(stepPath)
+    return filteredStepPaths
 
 def main():
     parser = argparse.ArgumentParser("Remesh dataset of target edge count")
@@ -388,6 +460,8 @@ def main():
     parser.add_argument('--targetEdges', required=True, type=int, help="Number of edges in a mesh")
     parser.add_argument('--meshSizeInitFactor', type=float, default=0.2, help="Initial mesh size factor")
     parser.add_argument('--numThreads', type=int, default=7, help="Number of threads")
+    parser.add_argument('--maxFaceCount', type=int, default=math.inf, help="Max face count in original ABC mesh, larger models will be skipped")
+    parser.add_argument('--maxSurfCount', type=int, default=150, help="Max surface count, larger models will be skipped")
 
     args = parser.parse_args()
 
@@ -396,16 +470,23 @@ def main():
     targetEdges = args.targetEdges
     meshSizeInitFactor = args.meshSizeInitFactor
     numThreads = args.numThreads
+    maxFaceCount = args.maxFaceCount
+    maxSurfCount = args.maxSurfCount
 
     print("Remesh dataset from {} to {} with #edges {}".format(srcPath,dstPath,targetEdges))
 
-    stepPaths = getStepPaths(os.path.abspath(srcPath))
+    absSrcPath = os.path.abspath(srcPath)
+    stepPaths = getStepPaths(absSrcPath)
     if (stepPaths == None):
         objPaths = list(map(lambda link: os.readlink(link),getObjLinks(srcPath)))
         stepPaths = list(map(objPathToStepPath,objPaths))
 
+    #stepPaths.sort()
+    statDir = os.path.join(absSrcPath, "stat")
     dstObjPath = os.path.join(dstPath,"obj")
     dstFeatPath = os.path.join(dstPath,"feat")
+    stepPaths = filterModels(stepPaths, statDir, maxFaceCount, maxSurfCount,  dstFeatPath, dstObjPath)
+
     try:
         Path(dstObjPath).mkdir(parents=True, exist_ok=True)
         Path(dstFeatPath).mkdir(parents=True, exist_ok=True)

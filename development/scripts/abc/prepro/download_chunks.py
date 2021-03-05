@@ -13,7 +13,7 @@ def downloadChunk(chunk, chunkType, datasetRoot):
         print('Downloading chunk from {} to {}'.format(url,dstPath))
         os.system("curl --insecure -o {} {}".format(dstPath, url))
 
-    os.system("7z x {} -o{}".format(dstPath, typeRoot))
+    os.system("7z x {} -aoa -o{}".format(dstPath, typeRoot))
     os.remove(dstPath)
 
 def downloadChunkType(chunkType, chunkIndex, datasetRoot):

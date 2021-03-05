@@ -134,7 +134,7 @@ def createMeshWithEdgeCount(min_edges, max_edges, objPath, name, segDirPath, sse
     last_num_edges = -inf
     last_factor = current_factor
     num_iters = 0
-    max_iters = 20
+    max_iters = 40
 
     while (num_iters < max_iters):
         gmsh.clear()
@@ -146,14 +146,13 @@ def createMeshWithEdgeCount(min_edges, max_edges, objPath, name, segDirPath, sse
         face_count = getMeshFaceCount(mesh)
         if (face_count == 0):
             # restart gmsh, sometimes it deadlocks
-            print("Internal gmsh error! Restarting gmsh")
-            geom.__exit__()
-            geom.__enter__()
-            continue
+            #geom.__exit__()
+            #geom.__enter__()
+            raise(Exception("Internal gmsh error! Restarting gmsh"))
         curr_num_edges = getEstMeshEdgeCount(mesh)
         computeMeshData(mesh)
         if min_edges <= mesh.meshData.edges_count <= max_edges:
-            #print("Target edges MET with factor {}: {} [{},{}]".format(current_factor, curr_num_edges, min_edges, max_edges))
+            print("Target edges MET with factor {}: {} [{},{}]".format(current_factor, mesh.meshData.edges_count, min_edges, max_edges))
             #geom.save_geometry("test.msh")
             saveMesh(objPath, mesh)
             createSegFiles(mesh.meshData, surfaces, name, segDirPath, ssegDirPath)
@@ -162,7 +161,9 @@ def createMeshWithEdgeCount(min_edges, max_edges, objPath, name, segDirPath, sse
         if (len(num_edges) == 0 and curr_num_edges > max_edges):
             raise Exception("Unexpectedly large mesh size for mesh factor 1")
         elif (current_factor < last_factor and curr_num_edges < last_num_edges):
-            raise Exception("Unexpected decrease of mesh size with increase in mesh factor")
+            #raise Exception("Unexpected decrease of mesh size with increase in mesh factor")
+            inv_factors = []
+            num_edges = []
 
         # Leave only the 3 closest values to target_edges
         inv_factors.append(1.0/current_factor)
@@ -180,7 +181,7 @@ def createMeshWithEdgeCount(min_edges, max_edges, objPath, name, segDirPath, sse
                 if (current_factor == None):
                     raise Exception("Factor could not be estimated")
         num_iters += 1
-    raise Exception("Didn't converge to target edges in 20 iterations")
+    raise Exception("Didn't converge to target edges in {} iterations".format(max_iters))
 
 def polygonSelfIntersects(vertices):
     lastSide = sp.Segment(vertices[-1],vertices[0])
@@ -310,28 +311,30 @@ def createCylinders(geom, objDirPath, segDirPath, ssegDirPath, minEdges, maxEdge
 
 defMeshSize = 1
 
-def createSphere(geom, azimuth, inclination, closeMesh, r=1.0):
-    # azimuth [0,pi]
-    # inclination [0,2*pi]
+def createSphere(geom, azimuth, inclination, closeMesh, r=1.0, meshSizeCenter = 0, meshSizeSphere = 0):
+    # azimuth [0,2*pi]
+    # inclination [0,pi]
 
     # Can't use OCC's addSphere, plane surfaces cannot be removed later.
-    center = geom.add_point([0, 0], mesh_size=defMeshSize)
-    a_start = geom.add_point([r, 0, 0], mesh_size=defMeshSize)
-    a_end = geom.add_point([r*np.cos(azimuth), 0, r*np.sin(azimuth)],mesh_size=defMeshSize)
-    azimuth_arc = geom.add_circle_arc(start=a_start, end=a_end, center=center)
-    azimuth_surface = geom.add_plane_surface(
-        geom.add_curve_loop([geom.add_line(center, a_start), azimuth_arc, geom.add_line(a_end, center)]))
+    #geom.env.addSphere(0,0,0,radius=r, angle1=-pi/2, angle2=inclination-pi/2, angle3=azimuth)
 
-    surfaces = geom._revolve(azimuth_surface, rotation_axis=[-1.0, 0.0, 0.0], point_on_axis=[0.0, 0.0, 0.0],
-                             angle=inclination)
+
+    center = geom.add_point([0, 0], mesh_size=meshSizeCenter)
+    a_start = geom.add_point([0, 0, r], mesh_size=meshSizeSphere)
+    a_end = geom.add_point([r*np.sin(inclination), 0, r*np.cos(inclination)],mesh_size=meshSizeSphere)
+    inclination_arc = geom.add_circle_arc(start=a_start, end=a_end, center=center)
+    curves = [geom.add_line(center, a_start), inclination_arc, geom.add_line(a_end, center)]
+    inclination_surface = geom.add_plane_surface(geom.add_curve_loop(curves))
+
+    surfaces = geom._revolve(inclination_surface, rotation_axis=[0.0, 0.0, 1.0], point_on_axis=[0.0, 0.0, 0.0],
+                             angle=azimuth)
 
     geom.remove(surfaces[1], False)  # remove volume (must be done first!)
-
     nonPlanarSurfs = {surfaces[2][0].dim_tag[1]: surfaceTypes.index("Sphere")}
 
-    if (not closeMesh or inclination >= 2*pi):
-        geom.remove(azimuth_surface)  # remove one end
-        if (surfaces[0].dim_tag[1] != azimuth_surface.dim_tag[1]):
+    if (not closeMesh or azimuth >= 2*pi):
+        geom.remove(inclination_surface)  # remove one end
+        if (surfaces[0].dim_tag[1] != inclination_surface.dim_tag[1]):
             geom.remove(surfaces[0])  # remove the other end
     if (len(surfaces[2]) > 1):
         coneSurf = surfaces[2][1]
@@ -344,7 +347,7 @@ def createSphere(geom, azimuth, inclination, closeMesh, r=1.0):
 def createSpheres(geom, objDirPath, segDirPath, ssegDirPath, minEdges, maxEdges, count, closeMeshes):
     surfaceType = "Sphere"
     min_angle = pi / 20
-    angles = [pi, 2 * pi]
+    angles = [2*pi, pi]
     for i in range(count):
         name = getSampleName(surfaceType, i)
         objPath = os.path.join(objDirPath, name + ".obj")
@@ -354,12 +357,13 @@ def createSpheres(geom, objDirPath, segDirPath, ssegDirPath, minEdges, maxEdges,
             try:
                 createMeshWithEdgeCount(minEdges, maxEdges, objPath, name, segDirPath, ssegDirPath,
                                         createSphere, geom, *angles, closeMeshes)
+                geom.save_geometry(name + ".msh")
             except Exception as error:
                 print("Meshing error:", error)
-                angles = np.random.rand(2) * [pi - min_angle, 2 * pi - min_angle] + min_angle
+                angles = np.random.rand(2) * [2 *pi - min_angle,  pi - min_angle] + min_angle
             else:
                 break
-        angles = np.random.rand(2) * [pi - min_angle, 2 * pi - min_angle] + min_angle
+        angles = np.random.rand(2) * [2 *pi - min_angle,  pi - min_angle] + min_angle
 
 
 def createCone(geom, radius0, height, radius1, angle, closeMesh):
@@ -573,23 +577,23 @@ def createRevolutionSurfaces(geom, objDirPath, segDirPath, ssegDirPath, minEdges
                 break
         angle = random.uniform(pi / 8, 2 * pi)
 
-def createBSplineSurface(geom, r, azimuth, inclination, num_divs_az, num_divs_inc, ctrl_point_heights, closeMesh):
-    azimuth = pi
-    inclination = pi/2
+def createBSplineSurface(geom, r, degree_inc, degree_az, num_divs_az, num_divs_inc, ctrl_point_heights, closeMesh):
+    azimuth = 2*pi
+    inclination = pi
 
     tmpSurfaces = []
-    if (closeMesh):
-        # Add a sphere wedge with same azimuth and inclination, then replace spherical side by bspline.
-        tmpSurfDict = createSphere(geom,azimuth,inclination, closeMesh, r)
-        surfaces = geom.env.getEntities(2)
-        sphereType = surfaceTypes.index("Sphere")
-        for surf in surfaces:
-            if (surf[1] in tmpSurfDict and tmpSurfDict[surf[1]] == sphereType):
-                geom.env.remove([surf])
-            else:
-                tmpSurfaces.append(surf)
+    # if (closeMesh):
+    #     # Add a sphere wedge with same azimuth and inclination, then replace spherical side by bspline.
+    #     tmpSurfDict = createSphere(geom,azimuth,inclination, closeMesh, r) #, defMeshSize, defMeshSize/1)
+    #     surfaces = geom.env.getEntities(2)
+    #     sphereType = surfaceTypes.index("Sphere")
+    #     for surf in surfaces:
+    #         if (surf[1] in tmpSurfDict and tmpSurfDict[surf[1]] == sphereType):
+    #             geom.env.remove([surf])
+    #         else:
+    #             tmpSurfaces.append(surf)
 
-    inc = 0 #pi/20
+    inc = 0
     inc_step = inclination / num_divs_inc
     az_step = azimuth / num_divs_az
     point_tags = []
@@ -598,70 +602,75 @@ def createBSplineSurface(geom, r, azimuth, inclination, num_divs_az, num_divs_in
         for j in range(num_divs_az+1):
             radius = r
             # Do not displace control points at the boundary so that later bspline surface can be sewed to the whole volume.
-            if (i != 0 and i!= num_divs_inc and j != 0 and j != num_divs_az): # and (i % 2) == 0 and (j % 2) == 0):
+            if (i != 0 and i!= num_divs_inc and j != 0 and j != num_divs_az):# and (i % 3) == 0 and (j % 3) == 0):
                 radius += ctrl_point_heights[i*(num_divs_az+1)+j]
-            p =geom.add_point([radius*np.sin(inc)*np.cos(az), radius*np.sin(inc)*np.sin(az), radius*np.cos(inc)], mesh_size=defMeshSize/100)
+            p =geom.add_point([radius*np.sin(inc)*np.cos(az), radius*np.sin(inc)*np.sin(az), radius*np.cos(inc)]) #, mesh_size=defMeshSize/1)
             point_tags.append(p._id)
             az += az_step
         inc += inc_step
 
     bsplineType = surfaceTypes.index("BSpline")
-    bsplineTag = geom.env.addBSplineSurface(point_tags, num_divs_az+1, degreeU=3, degreeV=3)
+    bsplineTag = geom.env.addBSplineSurface(point_tags, num_divs_az+1, degreeU=degree_az, degreeV=degree_inc)
+    return {bsplineTag: bsplineType}
 
-    if (not closeMesh):
-        return {bsplineTag: bsplineType}
+    # if (not closeMesh):
+    #     return {bsplineTag: bsplineType}
 
-    geom.env.synchronize()
-    xmin, ymin, zmin, xmax, ymax, zmax = gmsh.model.getBoundingBox(-1, -1)
-    bboxDiag = np.sqrt(((np.array([xmin,ymin,zmin])-np.array([xmax,ymax,zmax]))**2).sum())
-    #print("bbox diag:", bboxDiag)
-    tmpSurfaces += [(2,bsplineTag)]
-    finalEntities = geom.env.healShapes(tmpSurfaces, tolerance=bboxDiag/1e2)
-    volumeCreated = False
-    finalSurfaces = []
-    for ent in finalEntities:
-        if (ent[0] == 3):
-            volumeCreated = True
-        elif (ent[0] == 2):
-            finalSurfaces.append(ent[1])
-        else:
-            break
-
-    if (not volumeCreated):
-        raise Exception("BSpline surface could not be closed")
-
-    surfDict = {bsplineTag: bsplineType}
-    for i in range(len(finalSurfaces)):
-        tmpSurfTag = tmpSurfaces[i][1]
-        if tmpSurfTag in tmpSurfDict:
-            surfDict[finalSurfaces[i]] = tmpSurfDict[tmpSurfTag]
-    geom.env.remove(tmpSurfaces)
-    return surfDict
+    # geom.env.synchronize()
+    # xmin, ymin, zmin, xmax, ymax, zmax = gmsh.model.getBoundingBox(-1, -1)
+    # bboxDiag = np.sqrt(((np.array([xmin,ymin,zmin])-np.array([xmax,ymax,zmax]))**2).sum())
+    # #print("bbox diag:", bboxDiag)
+    # tmpSurfaces += [(2,bsplineTag)]
+    # finalEntities = geom.env.healShapes(tmpSurfaces, tolerance=bboxDiag/1e3) #, fixDegenerated=True, fixSmallEdges=True, fixSmallFaces=True, sewFaces=True, makeSolids=True)
+    # volumeCreated = False
+    # finalSurfaces = {}
+    # for ent in finalEntities:
+    #     if (ent[0] == 3):
+    #         volumeCreated = True
+    #     elif (ent[0] == 2):
+    #         finalSurfaces[ent[1]] = bsplineType
+    #     else:
+    #         break
+    #
+    # if (not volumeCreated):
+    #     raise Exception("BSpline surface could not be closed")
+    #
+    # surfDict = {bsplineTag: bsplineType}
+    # for i in range(len(finalSurfaces)):
+    #     tmpSurfTag = tmpSurfaces[i][1]
+    #     if tmpSurfTag in tmpSurfDict:
+    #         surfDict[finalSurfaces[i]] = tmpSurfDict[tmpSurfTag]
+    # geom.env.remove(tmpSurfaces)
+    # return surfDict
+    #return finalSurfaces
 
 def createBSplineSurfaces(geom, objDirPath, segDirPath, ssegDirPath, minEdges, maxEdges, count, closeMeshes):
     surfaceType = "BSpline"
-    min_angle = pi/2
 
-    for i in range(count):
+    firstNumber = getLastFileNumber(surfaceType, objDirPath) + 1
+
+    for i in range(firstNumber, count):
         name = getSampleName(surfaceType, i)
         objPath = os.path.join(objDirPath, name + ".obj")
 
         while True:
-            inclination = np.random.uniform(min_angle, pi)
-            azimuth = np.random.uniform(min_angle, 2*pi)
-            radius = 1 #np.random.uniform(0.1, 1)
-            num_divs_inc = round(np.random.uniform(10, 10))
-            num_divs_az = round(np.random.uniform(10, 10))
+            # inclination = np.random.uniform(min_angle, pi)
+            # azimuth = np.random.uniform(min_angle, 2*pi)
+            radius = 1
+            degree_inc = round(np.random.uniform(3, 6))
+            degree_az = round(np.random.uniform(3, 6))
+            num_divs_inc = round(np.random.uniform(2*degree_inc, 4*degree_inc))
+            num_divs_az = round(np.random.uniform(2*degree_az, 4*degree_az))
             num_ctrl_points = (num_divs_inc+1)*(num_divs_az+1)
             ctrl_point_heights = np.random.default_rng().random(num_ctrl_points) * radius/2 - radius/4
 
-            print("Create {} of {}x{} ctrl points around sphere patch with angles {}, {}, radius {}"
-                  .format(name, num_divs_az+1, num_divs_inc+1, inclination,azimuth, radius))
+            print("Create {} of degree {}x{} with {}x{} ctrl points around sphere"
+                  .format(name, degree_az, degree_inc, num_divs_az+1, num_divs_inc+1))
             try:
                 createMeshWithEdgeCount(minEdges, maxEdges, objPath, name, segDirPath, ssegDirPath,
-                                        createBSplineSurface, geom, radius, azimuth, inclination,
+                                        createBSplineSurface, geom, radius, degree_inc, degree_az,
                                         num_divs_az, num_divs_inc, ctrl_point_heights, closeMeshes)
-                geom.save_geometry(name + ".msh")
+               #geom.save_geometry(name + ".msh")
             except Exception as error:
                 print("Meshing error:", error)
             else:
@@ -716,8 +725,9 @@ with pygmsh.occ.Geometry() as geom:
     #gmsh.option.setNumber("Mesh.RefineSteps", 2)
     # gmsh.option.setNumber("General.Terminal", 1)
     gmsh.option.setNumber("Mesh.AlgorithmSwitchOnFailure", 0) # Fallback to Mesh-Adapt ends hanging up sometimes.
+    gmsh.option.setNumber("Mesh.MinimumElementsPerTwoPi", 8)
     #createPlaneSurfaces(geom, objPath, segPath, ssegPath, minEdges, maxEdges, numSurfaceSamples, closeMeshes)
-    # createSpheres(geom, objPath,segPath,ssegPath,minEdges,maxEdges,numSurfaceSamples, closeMeshes)
+    #createSpheres(geom, objPath,segPath,ssegPath,minEdges,maxEdges,numSurfaceSamples, closeMeshes)
     # createCones(geom, objPath,segPath,ssegPath,minEdges,maxEdges,numSurfaceSamples, closeMeshes)
     #createTori(geom, objPath,segPath,ssegPath,minEdges,maxEdges,numSurfaceSamples, closeMeshes)
     #createRevolutionSurfaces(geom, objPath, segPath, ssegPath, minEdges, maxEdges, numSurfaceSamples, closeMeshes)

@@ -27,8 +27,15 @@ def linkSegFiles(objPath, srcSegPath, srcSsegPath, dstSegPath, dstSsegPath):
     fileNamePrefix = os.path.splitext(os.path.basename(objPath))[0]
     srcSegFilePath = os.path.join(srcSegPath, fileNamePrefix +  ".eseg")
     srcSsegFilePath = os.path.join(srcSsegPath, fileNamePrefix + ".seseg")
-    os.symlink(os.path.abspath(srcSegFilePath), os.path.join(dstSegPath, os.path.basename(srcSegFilePath)))
-    os.symlink(os.path.abspath(srcSsegFilePath), os.path.join(dstSsegPath, os.path.basename(srcSsegFilePath)))
+    dstSegFilePath = os.path.join(dstSegPath, os.path.basename(srcSegFilePath))
+    dstSsegFilePath = os.path.join(dstSsegPath, os.path.basename(srcSsegFilePath))
+    if (os.path.exists(dstSegFilePath)):
+        os.remove(dstSegFilePath)
+    os.symlink(os.path.abspath(srcSegFilePath), dstSegFilePath)
+    if (os.path.exists(dstSsegFilePath)):
+        os.remove(dstSsegFilePath)
+    os.symlink(os.path.abspath(srcSsegFilePath), dstSsegFilePath)
+
 
 parser = argparse.ArgumentParser("Augment ABC dataset with synthetic samples")
 parser.add_argument('--src', required=True, type=str, help="Path where source ABC dataset is located.")
@@ -99,10 +106,10 @@ if (not os.path.exists(augSsegPath)):
     exit(1)
 
 try:
-    Path(dstTrainPath).mkdir(parents=True, exist_ok=False)
-    Path(dstTestPath).mkdir(parents=True, exist_ok=False)
-    Path(targetSegPath).mkdir(parents=True, exist_ok=False)
-    Path(targetSsegPath).mkdir(parents=True, exist_ok=False)
+    Path(dstTrainPath).mkdir(parents=True, exist_ok=True)
+    Path(dstTestPath).mkdir(parents=True, exist_ok=True)
+    Path(targetSegPath).mkdir(parents=True, exist_ok=True)
+    Path(targetSsegPath).mkdir(parents=True, exist_ok=True)
 except FileExistsError as f_error:
     print(f_error)
     exit(1)
