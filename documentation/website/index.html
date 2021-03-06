@@ -149,7 +149,7 @@
             layer was also reduced to less than a half by deleting temporary tensors once they're not needed and rewriting the symmetric functions so that they are done in place.<br><br>
             Another important bottleneck is that the edge collapsing at the MeshPool layer is done sequentially in CPU. As a result, MeshCNN training is
             CPU-bound and GPU utilization is low (under 30% in a NVIDIA Tesla P100). Training times become impractical for small datasets
-            (9h per epoch for 1K meshes of 35K edges). To alleviate this problem, we modified MeshCNN code to allow for distributed training across multiple CPUs or
+            (9h per epoch for 1K meshes of 35K edges). To alleviate this problem, we modified MeshCNN code to allow for distributed training across multiple CPUs, GPUs and
             even nodes. Using <a href="https://pytorch.org/docs/stable/generated/torch.nn.parallel.DistributedDataParallel.html"><i>torch.nn.parallel.DistributedDataParallel</i></a>, each batch
             is split and processed by identical instances of the model in separate devices, averaging the gradients for each node during the backwards pass.<br><br>
             Thanks to these optimizations we could train MeshCNN with ABC models of average size (~35K edges) and typical batch sizes (~10), having still room to increase
@@ -157,8 +157,9 @@
         </p>
         <h4 class="subsection-heading">Dataset preprocessing</h4>
         <p>As first preprocessing step for the compilation of dataset, we detect and exclude non-manifold meshes, since they're not supported by MeshCNN.<br>
-            Additionally, small connected components (<10% of total faces) within a model are likely to become non-manifold during pooling. Therefore, models with such small
-            components are also excluded.
+           Additionally, small connected components (<10% of total faces) within a model are likely to become non-manifold during pooling. Models with such small
+           components had to be excluded with the original MeshCNN code. To overcome this problem, we've modified MeshCNN to skip edge collapses that would result
+            in a non-manifold mesh.
         </p>
            <div class="row">
                 <div class="one-half column category">
@@ -175,8 +176,70 @@
                     </script>
                 </div>
             </div>
-    </div>
+        <h4 class="subsection-heading">Dataset remeshing</h4>
+        <p>ABC models are fairly large, some of them made of thousands of surface patches. The dataset comes with high resolution meshes, going from a few thousand edges to
+            hundreds of thousands. MeshCNN UNet architecture does class segmentation by applying a succession of convolution and pooling operations to the input features. Logically,
+            the larger the input meshes are, the more conv+pool stages are needed in the architecture.
+            The PAC framework estimates a minimum training sample size of O((VC + log(1/eta))/eps) to ensure the test error is not more than eps w.r.t the
+            training error with a confidence of (1-eta). The VC-dimension of a binary NN classifier is O(|w|), w being the #weights. MeshCNN has ~2.2M weights in the original paper configuration
+            (4 conv layers of 32,64,128,256 channels). The #weights increases proportionately with the number of conv channels and so does therefore the theorical min. training size.
+            Given the performance bottleneck cause by in-CPU edge collapsing, training average ABC mesh sizes (~35K) in MeshCNN becomes impractical.<br>
+            We've therefore remeshed ABC models using cadmesh to get a target size of 2000 edges. Since almost all ABC original meshes are larger than that, the error of the mesh w.r.t to the model
+            original surfaces had to be limited (using gmsh's element size setting MeshSizeFromCurvature). The remesh was attempted for the first 100K ABC models, from which only ~10K could be remeshed
+            into 2K meshes within the error bounds. Since gmsh cannot control the exact size of the output mesh, a 2% tolerance in the final #edges was applied, accepting only meshes with #edges in range
+            (1960-2000). Meshes smaller than target size are padded with invalid values during training, ignoring their contribution during backward propagation.
+        </p>
+        <h4 class="subsection-heading">Dataset augmentation</h4>
+        <div class="u-pull-right" style="width:50%; margin-left:20px">
+            <figure>
+                <img class="u-max-full-width" src="images/class_imbalance_chart.svg">
+                <figcaption>Edge class frequencies on 35K-edge mesh dataset</figcaption>
+            </figure>
+        </div>
+        <p>Surfaces in ABC dataset models are predominantly planes and cylinders, with less than 10% of the surfaces belonging to other classes. This imbalance in the
+            surface class occurrence biases the model towards the overrepresented classes and impedes the learning of the underrepresented surface types.Experiments applying
+            a weighted loss function to penalize more misclasiffications of the underrepresented classes show no noticeable improvement.<br>
+            The class imbalance was addressed by resampling. Any model made of exclusively of planes and cylinders was discarded, hence downsampling these classes. Additionally, synthetic samples were
+            created for the other classes to upsample them. The synthetic samples were created using gmsh to mesh parametric surfaces with uniformly distributed random parameters.<br>
+            The first synthetic samples were open meshes made of a single surface, thus having a fine control in the class upsampling. This approach has two problems: <br>
+            1. MeshCNN applies boundary-preserving edge collapses during pooling. As a result, the prediction accuracy near the mesh boundary is severely affected<br>
+            2. The model cannot learn to identify class boundaries with Synthetic samples made of a single surface.<br>
+            Thefore, the final synthetic dataset was composed of closed meshes made of multiple surface types.
+        </p>
+        <div class="row">
+                <div class="one-half column category">
+                    <h5 style="text-align:center">Cone open mesh (original size)</h5>
 
+                    <script class="model" src="models/open_cone_0.json" type="application/vnd.jupyter.widget-state+json"></script>
+                    <script type="application/vnd.jupyter.widget-view+json">
+                        {"version_major": 2, "version_minor": 0, "model_id": "df851097a6754f5c99f2bb48bb52c530"}
+                    </script>
+                </div>
+                <div class="one-half column category">
+                    <h5 style="text-align:center">Cone open mesh (after last pooling)</h5>
+                    <script class="model" src="models/open_cone_3.json" type="application/vnd.jupyter.widget-state+json"></script>
+                    <script type="application/vnd.jupyter.widget-view+json">
+                        {"version_major": 2, "version_minor": 0, "model_id": "22c489139c4e4b709192a78bab5b311b"}
+                    </script>
+                </div>
+                <table class="u-full-width">
+                    <tbody class="surface-types-table">
+                        <tr>
+                            <td class="surface-types" style="background-color:red">Plane</td>
+                            <td class="surface-types" style="background-color:blue">Cylinder</td>
+                            <td class="surface-types" style="background-color:magenta">Cone</td>
+                            <td class="surface-types" style="background-color:purple">Torus</td>
+                            <td class="surface-types" style="background-color:black">BSpline</td>
+                            <td class="surface-types" style="background-color:orange">Sphere</td>
+                            <td class="surface-types" style="background-color:green">Revolution</td>
+                            <td class="surface-types" style="background-color:cyan">Extrusion</td>
+                            <td class="surface-types" style="background-color:yellow">Other</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+    </div>
+    <div style="clear:both;display: block"/>
 
     <div class="docs-section" id="experiments">
         <h3 class="section-heading">Experiments</h3>
@@ -252,7 +315,7 @@
             </div>
         </div>
         <div>
-            <h4 class="subsection-heading">Medium dataset</h4>
+            <h4 class="subsection-heading">35K-edge mesh dataset</h4>
             <div class="u-pull-right-third">
                     <table class="u-full-width">
                             <tr>
@@ -351,12 +414,6 @@
                         </tr>
                     </tbody>
             </table>
-            </div>
-             <div class="u-pull-right" style="width:50%; margin-left:20px">
-                <figure>
-                    <img class="u-max-full-width" src="images/class_imbalance_chart.svg">
-                    <figcaption>Edge class frequencies on medium dataset</figcaption>
-                </figure>
             </div>
              <p> The model learns to predict the two most frequent classes (plane and cylinder surfaces), but no the rest. The optimization seems to stay at a local minima in the loss
                 function, most probably due to the imbalance in the class occurrence.
