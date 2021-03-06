@@ -10,6 +10,7 @@ from numpy.polynomial import Polynomial
 import sympy as sp
 import sys
 import glob
+import traceback
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__),"../../..")))
 
@@ -104,17 +105,6 @@ def computeMeshData(mesh):
     except Exception as error:
         print("mesh error", error)
 
-# def createLabelFiles(mesh, surfaceType, filename, segPath, ssegPath):
-#     edge_count = mesh.edge_count
-#     label = surfaceTypes.index(surfaceType)
-#     hard_labels = int(label) * np.ones(edge_count, dtype='int')
-#     np.savetxt(os.path.join(segPath, filename + ".eseg"), hard_labels, fmt='%d')
-#
-#     soft_labels = np.zeros((edge_count, len(surfaceTypes)), dtype='float64')
-#     soft_labels[:, label] = 1.0
-#     np.savetxt(os.path.join(ssegPath, filename + ".seseg"), soft_labels, fmt='%f')
-
-
 def estimateFactor(polynomial, target_edges):
     eq = (polynomial - target_edges)
     for factor_inv in eq.roots():
@@ -134,7 +124,7 @@ def createMeshWithEdgeCount(min_edges, max_edges, objPath, name, segDirPath, sse
     last_num_edges = -inf
     last_factor = current_factor
     num_iters = 0
-    max_iters = 40
+    max_iters = 20
 
     while (num_iters < max_iters):
         gmsh.clear()
@@ -263,38 +253,36 @@ def createPlaneSurfaces(geom, objDirPath, segDirPath, ssegDirPath, minEdges, max
                 break
 
 def createCylinder(geom, radius, length, angle, closeMesh):
-    side_idcs_to_remove = []
-    num_sections = 3
-    if (angle == pi):
-        num_sections = 4
-        side_idcs_to_remove = list(range(2, num_sections))
-    elif (angle < pi):
-        num_sections = ceil(2 * pi / angle)
-        side_idcs_to_remove = list(range(1, num_sections))
-    elif (angle < 2 * pi):
-        num_sections = ceil(2 * pi / (2 * pi - angle))
-        side_idcs_to_remove = list(range(0, num_sections - 1))
+    center = geom.add_point([0, 0])
+    a_start = geom.add_point([radius, 0])
 
-    circle = geom.add_circle(x0=[0, 0, 0], radius=radius, num_sections=num_sections)
-    surfaces = geom.extrude(circle.plane_surface, [0.0, 0.0, length])
+    if (angle < 2*pi):
+        a_end = geom.add_point([radius * np.cos(angle), radius * np.sin(angle)])
+        base_arc = geom.add_circle_arc(start=a_start, end=a_end, center=center)
+        curves = [geom.add_line(center, a_start), base_arc, geom.add_line(a_end, center)]
+    else:
+        a_middle =  geom.add_point([-radius, 0])
+        base_arc_a = geom.add_circle_arc(start=a_start, end=a_middle, center=center)
+        base_arc_b = geom.add_circle_arc(start=a_middle, end=a_start, center=center)
+        curves = [base_arc_b, base_arc_a]
+    base_surface = geom.add_plane_surface(geom.add_curve_loop(curves))
+    cyl_surf_type = surfaceTypes.index("Cylinder")
+    extr_surfs = extrude(geom, base_surface, length,closeMesh)
 
-    sides = surfaces[2]
-    geom.remove(surfaces[1], False)  # remove volume (must be done first!)
-    if (not closeMesh):
-        geom.remove(circle.plane_surface)  # remove bottom
-        geom.remove(surfaces[0])  # remove top
+    assert len(extr_surfs) == 2 or len(extr_surfs) == 3, "Unexpected number of surfaces"
 
-    for side_index in side_idcs_to_remove:
-        geom.remove(sides[side_index])
-
-    cylinderSurfsIndices = set(range(len(sides))) - set(side_idcs_to_remove)
-    return [ sides[i].dim_tag[1] for i in cylinderSurfsIndices]
+    if (len(extr_surfs) == 2):
+        return {surf.dim_tag[1]: cyl_surf_type for surf in extr_surfs}
+    else:
+        return {extr_surfs[1].dim_tag[1]: cyl_surf_type}
 
 def createCylinders(geom, objDirPath, segDirPath, ssegDirPath, minEdges, maxEdges, count, closeMeshes):
     surfaceType = "Cylinder"
-    min_angle = pi / 8 # Keep cylinder from looking like a plane
+    firstNumber = getLastFileNumber(surfaceType, objDirPath) + 1
+
+    min_angle = pi / 6 # Keep cylinder from looking like a plane
     params = [1, 1, 2 * pi]
-    for i in range(count):
+    for i in range(firstNumber, count):
         name = getSampleName(surfaceType, i)
         objPath = os.path.join(objDirPath, name + ".obj")
         while True:
@@ -302,8 +290,10 @@ def createCylinders(geom, objDirPath, segDirPath, ssegDirPath, minEdges, maxEdge
             try:
                 createMeshWithEdgeCount(minEdges, maxEdges, objPath, name, segDirPath, ssegDirPath,
                                         createCylinder, geom, *params, closeMeshes)
+                #geom.save_geometry(name + ".msh")
             except Exception as error:
                 print("Meshing error:", error)
+                #traceback.print_exc()
                 params = np.random.rand(3) * [1, 1, 2 * pi - min_angle] + [0, 0, min_angle]
             else:
                 break
@@ -357,7 +347,7 @@ def createSpheres(geom, objDirPath, segDirPath, ssegDirPath, minEdges, maxEdges,
             try:
                 createMeshWithEdgeCount(minEdges, maxEdges, objPath, name, segDirPath, ssegDirPath,
                                         createSphere, geom, *angles, closeMeshes)
-                geom.save_geometry(name + ".msh")
+                #geom.save_geometry(name + ".msh")
             except Exception as error:
                 print("Meshing error:", error)
                 angles = np.random.rand(2) * [2 *pi - min_angle,  pi - min_angle] + min_angle
@@ -482,19 +472,19 @@ def createTori(geom, objDirPath, segDirPath, ssegDirPath, minEdges, maxEdges, co
 
 
 def extrude(geom, input_surface, length, closeMesh):
-    surfaces = geom.extrude(input_surface, [0.0, 0.0, length * 1.0])
+    surfaces = geom.extrude(input_surface, [0.0, 0.0, length])
     if (not closeMesh):
         geom.remove(surfaces[1], False)  # remove volume (must be done first!)
         geom.remove(input_surface)  # remove bottom
         geom.remove(surfaces[0])  # remove top
-
-    extrusionLabel = surfaceTypes.index("Extrusion")
-    return {surf.dim_tag[1]: extrusionLabel  for surf in surfaces[2]}
+    return surfaces[2]
 
 def createExtrusionSurface(geom, points, length, closeMesh):
     # So far extrude only bspline surfaces.
     surface = createPlaneSurfaceFromBSpline(geom, points)
-    return extrude(geom, surface, length, closeMesh)
+    extrSurfs = extrude(geom, surface, length, closeMesh, )
+    extrType = surfaceTypes.index("Extrusion")
+    return {surf.dim_tag[1]: extrType  for surf in extrSurfs}
 
 def getLastFileNumber(surfaceName, path):
     pattern = os.path.join(path, surfaceName + "_*.obj")
@@ -712,10 +702,6 @@ createPath(objPath)
 createPath(segPath)
 createPath(ssegPath)
 
-# with pygmsh.geo.Geometry() as geom:
-#     gmsh.option.setNumber("Mesh.AlgorithmSwitchOnFailure", 0) # Fallback to Mesh-Adapt ends hanging up sometimes.
-#     createCylinders(geom, objPath,segPath,ssegPath,minEdges,maxEdges,numSurfaceSamples, closeMeshes)
-
 with pygmsh.occ.Geometry() as geom:
     #gmsh.option.setNumber("Mesh.RandomFactor", 1e-4)
     #gmsh.option.setNumber("Mesh.ScalingFactor", 10000)
@@ -726,6 +712,7 @@ with pygmsh.occ.Geometry() as geom:
     # gmsh.option.setNumber("General.Terminal", 1)
     gmsh.option.setNumber("Mesh.AlgorithmSwitchOnFailure", 0) # Fallback to Mesh-Adapt ends hanging up sometimes.
     gmsh.option.setNumber("Mesh.MinimumElementsPerTwoPi", 8)
+    createCylinders(geom, objPath, segPath, ssegPath, minEdges, maxEdges, numSurfaceSamples, closeMeshes)
     #createPlaneSurfaces(geom, objPath, segPath, ssegPath, minEdges, maxEdges, numSurfaceSamples, closeMeshes)
     #createSpheres(geom, objPath,segPath,ssegPath,minEdges,maxEdges,numSurfaceSamples, closeMeshes)
     # createCones(geom, objPath,segPath,ssegPath,minEdges,maxEdges,numSurfaceSamples, closeMeshes)
