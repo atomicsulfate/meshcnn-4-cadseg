@@ -207,38 +207,172 @@
             Thefore, the final synthetic dataset was composed of closed meshes made of multiple surface types.
         </p>
         <div class="row">
-                <div class="one-half column category">
-                    <h5 style="text-align:center">Cone open mesh (original size)</h5>
+            <div class="one-half column category">
+                <h5 style="text-align:center">Open cone prediction (original size)</h5>
 
-                    <script class="model" src="models/open_cone_0.json" type="application/vnd.jupyter.widget-state+json"></script>
-                    <script type="application/vnd.jupyter.widget-view+json">
-                        {"version_major": 2, "version_minor": 0, "model_id": "df851097a6754f5c99f2bb48bb52c530"}
-                    </script>
-                </div>
-                <div class="one-half column category">
-                    <h5 style="text-align:center">Cone open mesh (after last pooling)</h5>
-                    <script class="model" src="models/open_cone_3.json" type="application/vnd.jupyter.widget-state+json"></script>
-                    <script type="application/vnd.jupyter.widget-view+json">
-                        {"version_major": 2, "version_minor": 0, "model_id": "22c489139c4e4b709192a78bab5b311b"}
-                    </script>
-                </div>
-                <table class="u-full-width">
-                    <tbody class="surface-types-table">
-                        <tr>
-                            <td class="surface-types" style="background-color:red">Plane</td>
-                            <td class="surface-types" style="background-color:blue">Cylinder</td>
-                            <td class="surface-types" style="background-color:magenta">Cone</td>
-                            <td class="surface-types" style="background-color:purple">Torus</td>
-                            <td class="surface-types" style="background-color:black">BSpline</td>
-                            <td class="surface-types" style="background-color:orange">Sphere</td>
-                            <td class="surface-types" style="background-color:green">Revolution</td>
-                            <td class="surface-types" style="background-color:cyan">Extrusion</td>
-                            <td class="surface-types" style="background-color:yellow">Other</td>
-                        </tr>
-                    </tbody>
-                </table>
+                <script class="model" src="models/open_cone_0.json" type="application/vnd.jupyter.widget-state+json"></script>
+                <script type="application/vnd.jupyter.widget-view+json">
+                    {"version_major": 2, "version_minor": 0, "model_id": "df851097a6754f5c99f2bb48bb52c530"}
+                </script>
             </div>
-    </div>
+            <div class="one-half column category">
+                <h5 style="text-align:center">Open cone prediction (last pool)</h5>
+                <script class="model" src="models/open_cone_3.json" type="application/vnd.jupyter.widget-state+json"></script>
+                <script type="application/vnd.jupyter.widget-view+json">
+                    {"version_major": 2, "version_minor": 0, "model_id": "22c489139c4e4b709192a78bab5b311b"}
+                </script>
+            </div>
+            <table class="u-full-width">
+                <tbody class="surface-types-table">
+                    <tr>
+                        <td class="surface-types" style="background-color:red">Plane</td>
+                        <td class="surface-types" style="background-color:blue">Cylinder</td>
+                        <td class="surface-types" style="background-color:magenta">Cone</td>
+                        <td class="surface-types" style="background-color:purple">Torus</td>
+                        <td class="surface-types" style="background-color:black">BSpline</td>
+                        <td class="surface-types" style="background-color:orange">Sphere</td>
+                        <td class="surface-types" style="background-color:green">Revolution</td>
+                        <td class="surface-types" style="background-color:cyan">Extrusion</td>
+                        <td class="surface-types" style="background-color:yellow">Other</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="row">
+            <div class="one-half column category">
+                <h5 style="text-align:center">Closed cone ground truth</h5>
+
+                <script class="model" src="models/closed_cone.json" type="application/vnd.jupyter.widget-state+json"></script>
+                <script type="application/vnd.jupyter.widget-view+json">
+                    {"version_major": 2, "version_minor": 0, "model_id": "67d449359ae946818924794c4614073e"}
+                </script>
+            </div>
+            <div class="one-half column category">
+                <h5 style="text-align:center">Closed sphere ground truth</h5>
+                <script class="model" src="models/closed_sphere.json" type="application/vnd.jupyter.widget-state+json"></script>
+                <script type="application/vnd.jupyter.widget-view+json">
+                    {"version_major": 2, "version_minor": 0, "model_id": "1e55f66428f44cb1a42f2d8c97ef2d38"}
+                </script>
+            </div>
+            <table class="u-full-width">
+                <tbody class="surface-types-table">
+                    <tr>
+                        <td class="surface-types" style="background-color:red">Plane</td>
+                        <td class="surface-types" style="background-color:blue">Cylinder</td>
+                        <td class="surface-types" style="background-color:magenta">Cone</td>
+                        <td class="surface-types" style="background-color:purple">Torus</td>
+                        <td class="surface-types" style="background-color:black">BSpline</td>
+                        <td class="surface-types" style="background-color:orange">Sphere</td>
+                        <td class="surface-types" style="background-color:green">Revolution</td>
+                        <td class="surface-types" style="background-color:cyan">Extrusion</td>
+                        <td class="surface-types" style="background-color:yellow">Other</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="row">
+            <div class="one-half column category">
+                <h5 style="text-align:center">Closed Cylinder ground truth</h5>
+
+                <script class="model" src="models/closed_cylinder.json" type="application/vnd.jupyter.widget-state+json"></script>
+                <script type="application/vnd.jupyter.widget-view+json">
+                    {"version_major": 2, "version_minor": 0, "model_id": "e1caf92775c344d5921d3fa9ca9dbfbd"}
+                </script>
+            </div>
+            <div class="one-half column category">
+                <h5 style="text-align:center">Closed Torus ground truth</h5>
+                <script class="model" src="models/closed_torus.json" type="application/vnd.jupyter.widget-state+json"></script>
+                <script type="application/vnd.jupyter.widget-view+json">
+                    {"version_major": 2, "version_minor": 0, "model_id": "efbf3af875e446aebd5358e86331d654"}
+                </script>
+            </div>
+            <table class="u-full-width">
+                <tbody class="surface-types-table">
+                    <tr>
+                        <td class="surface-types" style="background-color:red">Plane</td>
+                        <td class="surface-types" style="background-color:blue">Cylinder</td>
+                        <td class="surface-types" style="background-color:magenta">Cone</td>
+                        <td class="surface-types" style="background-color:purple">Torus</td>
+                        <td class="surface-types" style="background-color:black">BSpline</td>
+                        <td class="surface-types" style="background-color:orange">Sphere</td>
+                        <td class="surface-types" style="background-color:green">Revolution</td>
+                        <td class="surface-types" style="background-color:cyan">Extrusion</td>
+                        <td class="surface-types" style="background-color:yellow">Other</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="row">
+            <div class="one-half column category">
+                <h5 style="text-align:center">Closed BSpline ground truth</h5>
+
+                <script class="model" src="models/closed_bspline.json" type="application/vnd.jupyter.widget-state+json"></script>
+                <script type="application/vnd.jupyter.widget-view+json">
+                    {"version_major": 2, "version_minor": 0, "model_id": "ff9efdfa0aa94eb2b291e7c0cd574d84"}
+                </script>
+            </div>
+            <div class="one-half column category">
+                <h5 style="text-align:center">Closed Extrusion ground truth</h5>
+                <script class="model" src="models/closed_extrusion.json" type="application/vnd.jupyter.widget-state+json"></script>
+                <script type="application/vnd.jupyter.widget-view+json">
+                    {"version_major": 2, "version_minor": 0, "model_id": "f416a8693b6f47a19f399004a3449943"}
+                </script>
+            </div>
+            <table class="u-full-width">
+                <tbody class="surface-types-table">
+                    <tr>
+                        <td class="surface-types" style="background-color:red">Plane</td>
+                        <td class="surface-types" style="background-color:blue">Cylinder</td>
+                        <td class="surface-types" style="background-color:magenta">Cone</td>
+                        <td class="surface-types" style="background-color:purple">Torus</td>
+                        <td class="surface-types" style="background-color:black">BSpline</td>
+                        <td class="surface-types" style="background-color:orange">Sphere</td>
+                        <td class="surface-types" style="background-color:green">Revolution</td>
+                        <td class="surface-types" style="background-color:cyan">Extrusion</td>
+                        <td class="surface-types" style="background-color:yellow">Other</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="row">
+            <div class="one-half column category">
+                <h5 style="text-align:center">Closed BSpline Revolution ground truth</h5>
+
+                <script class="model" src="models/closed_revolution_bspline.json" type="application/vnd.jupyter.widget-state+json"></script>
+                <script type="application/vnd.jupyter.widget-view+json">
+                    {"version_major": 2, "version_minor": 0, "model_id": "37d39f0fca864f45a56df01b979496db"}
+                </script>
+            </div>
+            <div class="one-half column category">
+                <h5 style="text-align:center">Closed Polygon Revolution ground truth</h5>
+                <script class="model" src="models/closed_revolution_polygon.json" type="application/vnd.jupyter.widget-state+json"></script>
+                <script type="application/vnd.jupyter.widget-view+json">
+                    {"version_major": 2, "version_minor": 0, "model_id": "7676e8f046c7497fa8119434076648a8"}
+                </script>
+            </div>
+            <table class="u-full-width">
+                <tbody class="surface-types-table">
+                    <tr>
+                        <td class="surface-types" style="background-color:red">Plane</td>
+                        <td class="surface-types" style="background-color:blue">Cylinder</td>
+                        <td class="surface-types" style="background-color:magenta">Cone</td>
+                        <td class="surface-types" style="background-color:purple">Torus</td>
+                        <td class="surface-types" style="background-color:black">BSpline</td>
+                        <td class="surface-types" style="background-color:orange">Sphere</td>
+                        <td class="surface-types" style="background-color:green">Revolution</td>
+                        <td class="surface-types" style="background-color:cyan">Extrusion</td>
+                        <td class="surface-types" style="background-color:yellow">Other</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    <h4 class="subsection-heading">Regularization</h4>
+    <p>To reduce overfitting we've used <a href="https://pytorch.org/docs/stable/_modules/torch/optim/adamw.html#AdamW"><i>AdamW</i></a> optimizer,
+        a version of Adam that includes decoupled weight decay regularization <a href="#3">[3]</a>:
+        \[
+            \boldsymbol{\theta_{t}} \leftarrow \boldsymbol{\theta_{t-1}} - \eta_{t}\left( \frac{\alpha \boldsymbol{\hat{m}_{t}}}{\sqrt{\boldsymbol{\hat{v}}_{t}}+\epsilon} + \lambda \boldsymbol{\theta_{t-1}}\right)
+        \]
+    </p>
     <div style="clear:both;display: block"/>
 
     <div class="docs-section" id="experiments">
@@ -272,6 +406,10 @@
                             <tr>
                                 <th>Batch size</th>
                                 <td>4</td>
+                            </tr>
+                            <tr>
+                                <th>Optimizer</th>
+                                <td>Adam</td>
                             </tr>
                             <tr>
                                 <th>Test accuracy</th>
@@ -341,6 +479,10 @@
                             <tr>
                                 <th>Batch size</th>
                                 <td>10</td>
+                            </tr>
+                            <tr>
+                                <th>Optimizer</th>
+                                <td>Adam</td>
                             </tr>
                             <tr>
                                 <th>Test accuracy</th>
@@ -420,11 +562,91 @@
             </p>
         </div>
         <div style="clear:both;display: block"/>
-        <h4 class="subsection-heading">Medium dataset (weighted)</h4>
-        <p>To escape the local minima reached in the previous experiment, we apply weights to the loss function (torch.nn.CrossEntropyLoss) inversely proportional to class occurrence in train set.</p>
-        <h4 class="subsection-heading">Medium dataset (resampled & weighted)</h4>
-        <p>This experiment uses a new dataset compiled oversampling the underrepresented classes and undersampling the most frequent ones. The remaining class imbalance is compensated by loss
-        function adjustments as in the previous experiment.</p>
+        <h4 class="subsection-heading">Remehesed & resampled dataset</h4>
+            <div class="u-pull-right-third">
+                <table class="u-full-width">
+                        <tr>
+                            <th>Train set size</th>
+                            <td>4000</td>
+                        </tr>
+                        <tr>
+                            <th>Test set size</th>
+                            <td>1000</td>
+                        </tr>
+                        <tr>
+                            <th>Mesh size</th>
+                            <td>[1920-2000]</td>
+                        </tr>
+                        <tr>
+                            <th>Convolution #channels</th>
+                            <td>32, 64, 128, 256, 512</td>
+                        </tr>
+                        <tr>
+                            <th>Pooling target sizes</th>
+                            <td>1600, 1280, 1024, 850</td>
+                        </tr>
+                        <tr>
+                            <th>Batch size</th>
+                            <td>10</td>
+                        </tr>
+                        <tr>
+                            <th>Optimizer</th>
+                            <td>AdamW</td>
+                        </tr>
+                        <tr>
+                            <th>Test accuracy</th>
+                            <td>85% (20 epochs)</td>
+                        </tr>
+                </table>
+            </div>
+            <p>This dataset contains 5000 ABC models sampled so they don't contain exclusively plane and cylinder surfaces, and remeshed to 2000 edges. The model has an additional conv+pooling stage and uses AdamW optimizer.
+                Even with the reduced mesh size, the increased capacity and the downsampling of plane and cylinder surfaces, the model shows a poor accuracy prediciting surfaces other than planes and cylinders.
+            </p>
+            <div style="clear:both;display: block"/>
+            <figure>
+                <img class="u-max-full-width" src="images/5K_dataset_results.svg">
+                <figcaption>Surface type frequency and prediction accuracy</figcaption>
+            </figure>
+        <h4 class="subsection-heading">Remeshed, resampled and augmented</h4>
+        <div class="u-pull-right-third">
+                <table class="u-full-width">
+                        <tr>
+                            <th>Train set size</th>
+                            <td>5104(ABC)+5100(synth)</td>
+                        </tr>
+                        <tr>
+                            <th>Test set size</th>
+                            <td>1275</td>
+                        </tr>
+                        <tr>
+                            <th>Mesh size</th>
+                            <td>[1960-2000]</td>
+                        </tr>
+                        <tr>
+                            <th>Convolution #channels</th>
+                            <td>32, 64, 128, 256, 512</td>
+                        </tr>
+                        <tr>
+                            <th>Pooling target sizes</th>
+                            <td>1600, 1280, 1024, 850</td>
+                        </tr>
+                        <tr>
+                            <th>Batch size</th>
+                            <td>10</td>
+                        </tr>
+                        <tr>
+                            <th>Optimizer</th>
+                            <td>AdamW</td>
+                        </tr>
+                        <tr>
+                            <th>Test accuracy</th>
+                            <td>85% (20 epochs)</td>
+                        </tr>
+                </table>
+            </div>
+        <p>In this final experiment the dataset is increased to more than 10K samples, half of which are synthetic closed meshes made of randomly parameterized surfaces added to upsample
+        the underrepresented surface types.</p>
+        <div style="clear:both;display: block"/>
     </div>
 
     <div class="docs-section" id="discussion">
@@ -454,6 +676,10 @@
           
             <li class="popover-item" id="2">
                 [2] Koch, Sebastian and Matveev, Albert and Jiang, Zhongshi and Williams, Francis and Artemov, Alexey and Burnaev, Evgeny and Alexa, Marc and Zorin, Denis and Panozzo, Daniele. 2019. ABC: A Big CAD Model Dataset For Geometric Deep Learning. <i>The IEEE Conference on Computer Vision and Pattern Recognition (CVPR) (June 2019). </i><a href="https://deep-geometry.github.io/abc-dataset"> https://deep-geometry.github.io/abc-dataset</a>
+            </li>
+
+            <li class="popover-item" id="3">
+                [3] Ilya Loshchilov, Frank Hutter. 2019. Decoupled Weight Decay Regularization. ICLR 2019.<i></i>
             </li>
             
         </ul>
