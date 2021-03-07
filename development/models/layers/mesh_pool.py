@@ -2,6 +2,8 @@
 import meshcnn.models.layers.mesh_pool
 
 class MeshPool(meshcnn.models.layers.mesh_pool.MeshPool):
+    def __init__(self, target):
+        super().__init__(target, True)
 
     @staticmethod
     def __is_triplete_removable(mesh, invalid_edges):

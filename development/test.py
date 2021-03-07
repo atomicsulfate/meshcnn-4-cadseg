@@ -6,12 +6,9 @@ import os
 import torch.distributed as dist
 import torch.multiprocessing as mp
 
-def setup(rank, numGPUs):
-    os.environ['MASTER_ADDR'] = 'localhost'
-    os.environ['MASTER_PORT'] = '12355'
-
+def setup():
     # initialize the process group
-    dist.init_process_group("nccl", rank=rank, world_size=numGPUs)
+    dist.init_process_group("nccl", init_method='env://')
 
 def create_test_options():
     opt = TestOptions().parse()
@@ -24,16 +21,16 @@ def test_model(model, opt, dataset, epoch=-1):
     writer.reset_counter()
     for i, data in enumerate(dataset):
         model.set_input(data)
-        ncorrect, nexamples = model.test()
-        writer.update_counter(ncorrect, nexamples)
-    writer.print_acc(epoch, writer.acc)
+        ncorrect, nexamples, ncorrectPerClass, nexamplesPerClass = model.test()
+        writer.update_counter(ncorrect, nexamples,  ncorrectPerClass, nexamplesPerClass )
+    writer.print_acc(epoch, writer.acc, writer.classAcc)
     return writer.acc
 
 def run_test(rank, numGPUs, opt):
     print('Running Test on rank {}'.format(rank))
-    setup(rank, numGPUs)
+    setup()
 
-    dataset = DistributedDataLoader(opt, numGPUs, rank)
+    dataset = DistributedDataLoader(opt)
     model = create_model(opt, rank)
     return test_model(model, opt, dataset)
 
@@ -55,4 +52,14 @@ if __name__ == '__main__':
         # loading of sparse tensors: https://github.com/pytorch/pytorch/issues/20248
         opt.num_threads = 0
 
-    mp.spawn(run_test, args=(numGPUs, opt), nprocs=numGPUs, join=True)
+    if 'LOCAL_RANK' in os.environ:
+        local_rank = os.environ['LOCAL_RANK']
+    else:
+        # Non dist mode, set dummy env variables.
+        local_rank = 0
+        os.environ['LOCAL_RANK'] = '0'
+        os.environ['RANK'] = '0'
+        os.environ['WORLD_SIZE'] = '1'
+        os.environ['MASTER_ADDR'] = 'localhost'
+        os.environ['MASTER_PORT'] = '12500'
+    run_test(local_rank, numGPUs, opt)

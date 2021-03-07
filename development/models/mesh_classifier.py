@@ -12,9 +12,10 @@ class DistributedClassifierModel(ClassifierModel):
         self.opt = opt
         self.gpu_id = opt.gpu_ids[rank]
 
-        print('Using distributed classifier model, GPU {}'.format(self.gpu_id))
+        print('Using distributed classifier model with AdamW optimizer, GPU {}'.format(self.gpu_id))
 
         self.device = torch.device('cuda:{}'.format(self.gpu_id))
+        torch.cuda.set_device(self.gpu_id)
         self.save_dir = join(opt.checkpoints_dir, opt.name)
         self.optimizer = None
         self.edge_features = None
@@ -29,12 +30,12 @@ class DistributedClassifierModel(ClassifierModel):
         # load/define networks
         self.net = networks.define_classifier(opt.input_nc, opt.ncf, opt.ninput_edges, opt.nclasses, opt,
                                               [self.gpu_id], opt.arch, opt.init_type, opt.init_gain)
-        self.net = DistributedDataParallel(self.net, device_ids=[self.gpu_id])
+        self.net = DistributedDataParallel(self.net, device_ids=[self.gpu_id], output_device=self.gpu_id)
         self.set_train(opt.is_train)
         self.criterion = define_loss(opt).to(self.device)
 
         if self.is_train:
-            self.optimizer = torch.optim.Adam(self.net.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
+            self.optimizer = torch.optim.AdamW(self.net.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999))
             self.scheduler = networks.get_scheduler(self.optimizer, opt)
             print_network(self.net)
 
@@ -86,8 +87,32 @@ class DistributedClassifierModel(ClassifierModel):
             pred_class = out.data.max(1)[1]
             label_class = self.labels
             self.export_segmentation(pred_class.cpu(), label_class)
-            correct = self.get_accuracy(pred_class, label_class)
-        return correct, len(label_class)
+            correct, class_correct, class_examples = self.seg_accuracy_class(pred_class)
+
+        return correct, len(label_class), class_correct, class_examples
+
+    def seg_accuracy_class(self, predicted):
+        correct = 0
+        ssegs = self.soft_label.squeeze(-1)
+        preds = predicted.cpu().unsqueeze(dim=2)
+        correct_mat = ssegs.gather(2, preds)
+        nclasses = self.soft_label.shape[2]
+        class_correct = torch.zeros([nclasses])
+        class_examples = torch.zeros([nclasses])
+
+        for mesh_id, mesh in enumerate(self.mesh):
+            correct_vec = correct_mat[mesh_id, :mesh.edges_count, 0]
+            preds_mesh = preds[mesh_id, :mesh.edges_count].squeeze(-1)
+            edge_areas = torch.from_numpy(mesh.get_edge_areas())
+            correct += (correct_vec.float() * edge_areas).sum()
+            for cls in range(nclasses):
+                # substract areas for correct edges with another label.
+                class_area = (self.soft_label[mesh_id, :mesh.edges_count, cls]  * edge_areas * ((correct_vec == 0) | (preds_mesh == cls))).sum()
+                if class_area > 0:
+                    class_correct[cls] += (correct_vec[preds_mesh == cls].float() * edge_areas[preds_mesh == cls]).sum()
+                    class_examples[cls] += class_area / torch.sum(edge_areas)
+
+        return correct, class_correct, class_examples
 
     def export_segmentation(self, pred_seg, label_seg):
         if self.opt.dataset_mode == 'segmentation':

@@ -4,13 +4,11 @@ from data.base_dataset import collate_fn
 
 class DistributedDataLoader(DataLoader):
     """multi-process data loading"""
-    def __init__(self, opt, numGPUs, rank):
+    def __init__(self, opt):
         self.opt = opt
         self.dataset = CreateDataset(opt)
         self.sampler = torch.utils.data.distributed.DistributedSampler(
             self.dataset,
-            num_replicas=numGPUs,
-            rank=rank,
             shuffle=not opt.serial_batches
         )
         self.dataloader = torch.utils.data.DataLoader(
