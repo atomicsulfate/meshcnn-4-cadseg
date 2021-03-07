@@ -86,6 +86,9 @@ for srcPath in srcPaths:
     else:
         segLabels = getEdgeHardLabels(mesh, objPathToFeatPath(srcPath))
 
+    if (not os.path.exists(dstPath)):
+        os.mkdir(dstPath)
+
     print("Color mesh {} with labels {}, result in {}".format(srcPath,segPath, dstPath))
     colorMesh(mesh,segLabels,srcPath, dstPath)
 

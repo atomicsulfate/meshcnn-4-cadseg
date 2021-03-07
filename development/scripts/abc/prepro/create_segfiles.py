@@ -146,7 +146,6 @@ if __name__=='__main__':
 
     objLinks.sort()
     objFileTargets = list(map(lambda link: os.readlink(link),objLinks)) if os.path.islink(objLinks[0]) else objLinks
-    featFilePaths = list(map(objPathToFeatPath,objFileTargets))
 
     for objPath in objFileTargets:
         fileNamePrefix = os.path.splitext(os.path.basename(objPath))[0]
