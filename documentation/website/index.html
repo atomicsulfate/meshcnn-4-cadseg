@@ -600,9 +600,133 @@
                 </table>
             </div>
             <p>This dataset contains 5000 ABC models sampled so they don't contain exclusively plane and cylinder surfaces, and remeshed to 2000 edges. The model has an additional conv+pooling stage and uses AdamW optimizer.
-                Even with the reduced mesh size, the increased capacity and the downsampling of plane and cylinder surfaces, the model shows a poor accuracy prediciting surfaces other than planes and cylinders.
+                Even with the reduced mesh size, the increased capacity and the surface class resampling, the model shows a poor accuracy prediciting surfaces other than planes and cylinders.
             </p>
-            <div style="clear:both;display: block"/>
+        <div style="clear:both;display: block"/>
+        <div class="row">
+                <div class="one-half column category">
+                    <h5 style="text-align:center">Model 25725 (prediction)</h5>
+                    <script class="model" src="models/5K_dataset/25725_pred.json" type="application/vnd.jupyter.widget-state+json"></script>
+                    <script type="application/vnd.jupyter.widget-view+json">
+                        {"version_major": 2, "version_minor": 0, "model_id": "3df22ce772be4ef3851ae9cb36922a8d"}
+                    </script>
+                </div>
+                <div class="one-half column category">
+                    <h5 style="text-align:center">Model 25725 (ground truth)</h5>
+                    <script class="model" src="models/5K_dataset/25725_truth.json" type="application/vnd.jupyter.widget-state+json"></script>
+                    <script type="application/vnd.jupyter.widget-view+json">
+                        {"version_major": 2, "version_minor": 0, "model_id": "94c4b920cd524bab8aff93e63c4cb938"}
+                    </script>
+                </div>
+                <table class="u-full-width">
+                    <tbody class="surface-types-table">
+                        <tr>
+                            <td class="surface-types" style="background-color:red">Plane</td>
+                            <td class="surface-types" style="background-color:blue">Cylinder</td>
+                            <td class="surface-types" style="background-color:magenta">Cone</td>
+                            <td class="surface-types" style="background-color:purple">Torus</td>
+                            <td class="surface-types" style="background-color:black">BSpline</td>
+                            <td class="surface-types" style="background-color:orange">Sphere</td>
+                            <td class="surface-types" style="background-color:green">Revolution</td>
+                            <td class="surface-types" style="background-color:cyan">Extrusion</td>
+                            <td class="surface-types" style="background-color:yellow">Other</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        <div class="row">
+            <div class="one-half column category">
+                <h5 style="text-align:center">Model 170737 (prediction)</h5>
+                 <script class="model" src="models/5K_dataset/170737_pred.json" type="application/vnd.jupyter.widget-state+json"></script>
+                <script type="application/vnd.jupyter.widget-view+json">
+                    {"version_major": 2, "version_minor": 0, "model_id": "fa0586c7a24c42a69166acee0e5cefec"}
+                </script>
+            </div>
+            <div class="one-half column category">
+                <h5 style="text-align:center">Model 170737 (ground truth)</h5>
+                <script class="model" src="models/5K_dataset/170737_truth.json" type="application/vnd.jupyter.widget-state+json"></script>
+                <script type="application/vnd.jupyter.widget-view+json">
+                    {"version_major": 2, "version_minor": 0, "model_id": "282018be6bf94efd9d217cb42754a58b"}
+                </script>
+            </div>
+            <table class="u-full-width">
+                <tbody class="surface-types-table">
+                    <tr>
+                        <td class="surface-types" style="background-color:red">Plane</td>
+                        <td class="surface-types" style="background-color:blue">Cylinder</td>
+                        <td class="surface-types" style="background-color:magenta">Cone</td>
+                        <td class="surface-types" style="background-color:purple">Torus</td>
+                        <td class="surface-types" style="background-color:black">BSpline</td>
+                        <td class="surface-types" style="background-color:orange">Sphere</td>
+                        <td class="surface-types" style="background-color:green">Revolution</td>
+                        <td class="surface-types" style="background-color:cyan">Extrusion</td>
+                        <td class="surface-types" style="background-color:yellow">Other</td>
+                    </tr>
+                </tbody>
+        </table>
+        </div>
+        <div class="row">
+                <div class="one-half column category">
+                    <h5 style="text-align:center">Model 1578 (prediction)</h5>
+                    <script class="model" src="models/5K_dataset/1578_pred.json" type="application/vnd.jupyter.widget-state+json"></script>
+                    <script type="application/vnd.jupyter.widget-view+json">
+                        {"version_major": 2, "version_minor": 0, "model_id": "2d77c8c308d24ab295f1a34165af6f98"}
+                    </script>
+                </div>
+                <div class="one-half column category">
+                    <h5 style="text-align:center">Model 1578 (ground truth)</h5>
+                    <script class="model" src="models/5K_dataset/1578_truth.json" type="application/vnd.jupyter.widget-state+json"></script>
+                    <script type="application/vnd.jupyter.widget-view+json">
+                        {"version_major": 2, "version_minor": 0, "model_id": "d16fa266c623420290ff4acd2af024e1"}
+                    </script>
+                </div>
+                <table class="u-full-width">
+                    <tbody class="surface-types-table">
+                        <tr>
+                            <td class="surface-types" style="background-color:red">Plane</td>
+                            <td class="surface-types" style="background-color:blue">Cylinder</td>
+                            <td class="surface-types" style="background-color:magenta">Cone</td>
+                            <td class="surface-types" style="background-color:purple">Torus</td>
+                            <td class="surface-types" style="background-color:black">BSpline</td>
+                            <td class="surface-types" style="background-color:orange">Sphere</td>
+                            <td class="surface-types" style="background-color:green">Revolution</td>
+                            <td class="surface-types" style="background-color:cyan">Extrusion</td>
+                            <td class="surface-types" style="background-color:yellow">Other</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        <div class="row">
+            <div class="one-half column category">
+                <h5 style="text-align:center">Model 16769 (prediction)</h5>
+                 <script class="model" src="models/5K_dataset/16769_pred.json" type="application/vnd.jupyter.widget-state+json"></script>
+                <script type="application/vnd.jupyter.widget-view+json">
+                    {"version_major": 2, "version_minor": 0, "model_id": "de7c5fcf151a45348bb8718f2310dc67"}
+                </script>
+            </div>
+            <div class="one-half column category">
+                <h5 style="text-align:center">Model 16769 (ground truth)</h5>
+                <script class="model" src="models/5K_dataset/16769_truth.json" type="application/vnd.jupyter.widget-state+json"></script>
+                <script type="application/vnd.jupyter.widget-view+json">
+                    {"version_major": 2, "version_minor": 0, "model_id": "8900b758307545328f1a2a908aadecc9"}
+                </script>
+            </div>
+            <table class="u-full-width">
+                <tbody class="surface-types-table">
+                    <tr>
+                        <td class="surface-types" style="background-color:red">Plane</td>
+                        <td class="surface-types" style="background-color:blue">Cylinder</td>
+                        <td class="surface-types" style="background-color:magenta">Cone</td>
+                        <td class="surface-types" style="background-color:purple">Torus</td>
+                        <td class="surface-types" style="background-color:black">BSpline</td>
+                        <td class="surface-types" style="background-color:orange">Sphere</td>
+                        <td class="surface-types" style="background-color:green">Revolution</td>
+                        <td class="surface-types" style="background-color:cyan">Extrusion</td>
+                        <td class="surface-types" style="background-color:yellow">Other</td>
+                    </tr>
+                </tbody>
+        </table>
+        </div>
             <figure>
                 <img class="u-max-full-width" src="images/5K_dataset_results.svg">
                 <figcaption>Surface type frequency and prediction accuracy</figcaption>
@@ -651,7 +775,38 @@
 
     <div class="docs-section" id="discussion">
         <h3 class="section-heading">Discussion and Future Work</h3>
-        <p class="section-description"></p>
+        <p>In this project we've evaluated the performance of MeshCNN predicting mesh segmentation by surface type in CAD models from ABC dataset. The outcome of the experiments helped us identify multiple
+        root causes for the poor accuracy exhibited by the tested models, some intrinsic to the problem definition, others related to architectural and implementation shortcomings of MeshCNN.</p>
+        <h4 class="subsection-heading">1. CAD Surface type imbalance and overlapping</h4>
+        <!--<p>The problem of segmenting CAD meshes by surface type suffers from class imbalance and overlapping. As already discussed, more than 90% of the surfaces in ABC models are plane and cylinders, an imbalance that
+        can probably be extrapolated to CAD models in general. </p>-->
+        <ul>
+            <li>>90% surfaces in CAD models are planes or cylinders</li>
+            <li>Class surfaces are overlapped
+                <ul>
+                    <li>Cylinder, Cone, Torus, Sphere \( \subset \) Revolution</li>
+                    <li>Cylinder, Cone, Torus, Sphere \( \subset \) BSpline</li>
+                    <li>Cylinder \( \subset \) Extrusion</li>
+                    <li>Plane \( \cap \) Extrusion \( \neq \emptyset \)</li>
+                </ul>
+            </li>
+        </ul>
+        <h4 class="subsection-heading">2. MeshCNN CPU and memory performance bottlenecks</h4>
+        <ul>
+            <li>Memory bottleneck solved by using sparse matrices for edge collapse accounting in pooling/unpooling</li>
+            <li>There multiple research papers on mesh simplification on GPU, some using edge collapses <a href="#4">[4]</a> <a href="#5">[5]</a></li>
+        </ul>
+        <!--<p>The success of CNN and other deep neural networks in the last decade has been enabled by the availability of large datasets and the capacity</p>-->
+        <h4 class="subsection-heading">3. Mesh pooling limitations</h4>
+        <ul>
+            <li>Boundary-preserving edge collapsing inhibits learning segmentation near boundaries in open meshes</li>
+            <li>Mesh can generally be simplified down to slightly less half their original edge count (vs downsampling to 10% in image segmentation)
+                <ul>
+                    <li>Some surface types can be easily identified by their local curvature: sphere, cylinder, cone, torus</li>
+                    <li>General extrusion and revolution surfaces are not identifiable by local features, CNN must pool them until they fit the receptive field</li>
+                </ul>
+            </li>
+        </ul>
     </div>
 
     <div class="docs-section" id="appendix">
@@ -679,7 +834,15 @@
             </li>
 
             <li class="popover-item" id="3">
-                [3] Ilya Loshchilov, Frank Hutter. 2019. Decoupled Weight Decay Regularization. ICLR 2019.<i></i>
+                [3] Ilya Loshchilov, Frank Hutter. 2019. Decoupled Weight Decay Regularization. ICLR 2019.
+            </li>
+
+            <li class="popover-item" id="4">
+                [4] Alexandros Papageorgiou,Nikos Platis. 2015. Triangular mesh simplification on the GPU. The Visual Computer 31.
+            </li>
+
+             <li class="popover-item" id="5">
+                [5] Odaker, Thomas; Kranzlmüller, Dieter; Volkert, Jens (2016): GPU-Accelerated Real-Time Mesh Simplification Using Parallel Half Edge Collapses.
             </li>
             
         </ul>
