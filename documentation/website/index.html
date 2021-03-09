@@ -177,7 +177,26 @@
                 </div>
             </div>
         <h4 class="subsection-heading">Dataset remeshing</h4>
-        <p>ABC models are fairly large, some of them made of thousands of surface patches. The dataset comes with high resolution meshes, going from a few thousand edges to
+        <ul>
+            <li>ABC meshes have very different sizes, from 5K-200K edges</li>
+            <li>MeshCNN needs input meshes of similar size</li>
+            <li>Datasets of meshes of average size (~35K edges) compiled from ABC dataset are too small (~1K samples out of first 10K ABC models)</li>
+            <li>Training times for 35K-edge meshes are impractical</li>
+        <li>PAC learning framework defines a worst case training set size <i>m</i> for a classifier with VC dimension <i>d</i> to ensure a maximum
+            test error deviation \(\epsilon\) with a certainty of \( 1 - \eta \):
+        \[
+            m = \mathcal{O}\big(\frac{d + \log(\frac{1}{\eta})}{\epsilon}\big)
+        \]</li>
+            <li>The VC dimension of a (binary) NN classifier is \(\mathcal{O}(|w|)\)</li>
+            <li>MeshCNN has 2.2M weights in its original config (4 conv layers)</li>
+            <li>The larger the input meshes, the more conv. layers are needed</li>
+            <li>Worst-case training set size for small meshes (~1K edges) is <b> >2M samples</b></li>
+            <li>Solution: Remesh ABC models using cadmesh to get a target size of 2K edges</li>
+            <li>Most models are too large to fit into 2K edges with reasonable error w.r.t original surfaces</li>
+            <li>Meshing error controlled by setting custom face size constraints in gmsh (MeshSizeFromCurvature)</li>
+            <li>10K meshes obtained from the first 170K ABC models</li>
+        </ul>
+        <!--<p>ABC models are fairly large, some of them made of thousands of surface patches. The dataset comes with high resolution meshes, going from a few thousand edges to
             hundreds of thousands. MeshCNN UNet architecture does class segmentation by applying a succession of convolution and pooling operations to the input features. Logically,
             the larger the input meshes are, the more conv+pool stages are needed in the architecture.
             The PAC framework estimates a minimum training sample size of O((VC + log(1/eta))/eps) to ensure the test error is not more than eps w.r.t the
@@ -188,7 +207,7 @@
             original surfaces had to be limited (using gmsh's element size setting MeshSizeFromCurvature). The remesh was attempted for the first 100K ABC models, from which only ~10K could be remeshed
             into 2K meshes within the error bounds. Since gmsh cannot control the exact size of the output mesh, a 2% tolerance in the final #edges was applied, accepting only meshes with #edges in range
             (1960-2000). Meshes smaller than target size are padded with invalid values during training, ignoring their contribution during backward propagation.
-        </p>
+        </p>-->
         <h4 class="subsection-heading">Dataset augmentation</h4>
         <div class="u-pull-right" style="width:50%; margin-left:20px">
             <figure>
@@ -764,13 +783,17 @@
                         </tr>
                         <tr>
                             <th>Test accuracy</th>
-                            <td>85% (20 epochs)</td>
+                            <td>85.6% (20 epochs)</td>
                         </tr>
                 </table>
             </div>
         <p>In this final experiment the dataset is increased to more than 10K samples, half of which are synthetic closed meshes made of randomly parameterized surfaces added to upsample
-        the underrepresented surface types.</p>
+        the underrepresented surface types. The results show an important improvement in the prediction accuracy for sphere surfaces. There's no improvement however in the accuracy for other classes.</p>
         <div style="clear:both;display: block"/>
+        <figure>
+                <img class="u-max-full-width" src="images/10K_dataset_results.svg">
+                <figcaption>Surface type frequency and prediction accuracy</figcaption>
+        </figure>
     </div>
 
     <div class="docs-section" id="discussion">
@@ -791,22 +814,147 @@
                 </ul>
             </li>
         </ul>
+        <div class="row">
+            <div class="one-half column category">
+                <h5 style="text-align:center">Model 18963 (prediction)</h5>
+                 <script class="model" src="models/ambiguous_cases/18963_pred.json" type="application/vnd.jupyter.widget-state+json"></script>
+                <script type="application/vnd.jupyter.widget-view+json">
+                    {"version_major": 2, "version_minor": 0, "model_id": "66a24d0be076415bae965ce824ea7893"}
+                </script>
+            </div>
+            <div class="one-half column category">
+                <h5 style="text-align:center">Model 18963 (ground truth)</h5>
+                <script class="model" src="models/ambiguous_cases/18963_truth.json" type="application/vnd.jupyter.widget-state+json"></script>
+                <script type="application/vnd.jupyter.widget-view+json">
+                    {"version_major": 2, "version_minor": 0, "model_id": "5f013567fbc54f5fa396085522241c81"}
+                </script>
+            </div>
+            <table class="u-full-width">
+                <tbody class="surface-types-table">
+                    <tr>
+                        <td class="surface-types" style="background-color:red">Plane</td>
+                        <td class="surface-types" style="background-color:blue">Cylinder</td>
+                        <td class="surface-types" style="background-color:magenta">Cone</td>
+                        <td class="surface-types" style="background-color:purple">Torus</td>
+                        <td class="surface-types" style="background-color:black">BSpline</td>
+                        <td class="surface-types" style="background-color:orange">Sphere</td>
+                        <td class="surface-types" style="background-color:green">Revolution</td>
+                        <td class="surface-types" style="background-color:cyan">Extrusion</td>
+                        <td class="surface-types" style="background-color:yellow">Other</td>
+                    </tr>
+                </tbody>
+        </table>
+        </div>
+        <div class="row">
+            <div class="one-half column category">
+                <h5 style="text-align:center">Model 1966 (prediction)</h5>
+                 <script class="model" src="models/ambiguous_cases/1966_pred.json" type="application/vnd.jupyter.widget-state+json"></script>
+                <script type="application/vnd.jupyter.widget-view+json">
+                    {"version_major": 2, "version_minor": 0, "model_id": "8d8326099b984888aa0ccd91d8a999dc"}
+                </script>
+            </div>
+            <div class="one-half column category">
+                <h5 style="text-align:center">Model 1966 (ground truth)</h5>
+                <script class="model" src="models/ambiguous_cases/1966_truth.json" type="application/vnd.jupyter.widget-state+json"></script>
+                <script type="application/vnd.jupyter.widget-view+json">
+                    {"version_major": 2, "version_minor": 0, "model_id": "66fd0acd66fb457ebb71d03ecb0426ab"}
+                </script>
+            </div>
+            <table class="u-full-width">
+                <tbody class="surface-types-table">
+                    <tr>
+                        <td class="surface-types" style="background-color:red">Plane</td>
+                        <td class="surface-types" style="background-color:blue">Cylinder</td>
+                        <td class="surface-types" style="background-color:magenta">Cone</td>
+                        <td class="surface-types" style="background-color:purple">Torus</td>
+                        <td class="surface-types" style="background-color:black">BSpline</td>
+                        <td class="surface-types" style="background-color:orange">Sphere</td>
+                        <td class="surface-types" style="background-color:green">Revolution</td>
+                        <td class="surface-types" style="background-color:cyan">Extrusion</td>
+                        <td class="surface-types" style="background-color:yellow">Other</td>
+                    </tr>
+                </tbody>
+        </table>
+        </div>
+        <div class="row">
+            <div class="one-half column category">
+                <h5 style="text-align:center">Model 19806 (prediction)</h5>
+                 <script class="model" src="models/ambiguous_cases/19806_pred.json" type="application/vnd.jupyter.widget-state+json"></script>
+                <script type="application/vnd.jupyter.widget-view+json">
+                    {"version_major": 2, "version_minor": 0, "model_id": "450da19248e14ccaa7e00889cde67681"}
+                </script>
+            </div>
+            <div class="one-half column category">
+                <h5 style="text-align:center">Model 19806 (ground truth)</h5>
+                <script class="model" src="models/ambiguous_cases/19806_truth.json" type="application/vnd.jupyter.widget-state+json"></script>
+                <script type="application/vnd.jupyter.widget-view+json">
+                    {"version_major": 2, "version_minor": 0, "model_id": "a590d1e88a0d4394bccef7f8779f7be5"}
+                </script>
+            </div>
+            <table class="u-full-width">
+                <tbody class="surface-types-table">
+                    <tr>
+                        <td class="surface-types" style="background-color:red">Plane</td>
+                        <td class="surface-types" style="background-color:blue">Cylinder</td>
+                        <td class="surface-types" style="background-color:magenta">Cone</td>
+                        <td class="surface-types" style="background-color:purple">Torus</td>
+                        <td class="surface-types" style="background-color:black">BSpline</td>
+                        <td class="surface-types" style="background-color:orange">Sphere</td>
+                        <td class="surface-types" style="background-color:green">Revolution</td>
+                        <td class="surface-types" style="background-color:cyan">Extrusion</td>
+                        <td class="surface-types" style="background-color:yellow">Other</td>
+                    </tr>
+                </tbody>
+        </table>
+        </div>
         <h4 class="subsection-heading">2. MeshCNN CPU and memory performance bottlenecks</h4>
         <ul>
             <li>Memory bottleneck solved by using sparse matrices for edge collapse accounting in pooling/unpooling</li>
-            <li>There multiple research papers on mesh simplification on GPU, some using edge collapses <a href="#4">[4]</a> <a href="#5">[5]</a></li>
+            <li>Multiple research papers on mesh simplification on GPU, some using edge collapses <a href="#4">[4]</a> <a href="#5">[5]</a></li>
         </ul>
         <!--<p>The success of CNN and other deep neural networks in the last decade has been enabled by the availability of large datasets and the capacity</p>-->
         <h4 class="subsection-heading">3. Mesh pooling limitations</h4>
         <ul>
             <li>Boundary-preserving edge collapsing inhibits learning segmentation near boundaries in open meshes</li>
-            <li>Mesh can generally be simplified down to slightly less half their original edge count (vs downsampling to 10% in image segmentation)
+            <li>Mesh can be simplified down to slightly less half their original edge count (vs 10% for images)
                 <ul>
                     <li>Some surface types can be easily identified by their local curvature: sphere, cylinder, cone, torus</li>
-                    <li>General extrusion and revolution surfaces are not identifiable by local features, CNN must pool them until they fit the receptive field</li>
+                    <li>General extrusion and revolution surfaces are more general concepts, not identifiable by local features, CNN must pool them until they fit the receptive field</li>
                 </ul>
             </li>
+            <li>Non-uniform pooling caused by adaptive edge collapsing further inhibits the application of larger receptive fields to some mesh regions</li>
         </ul>
+        <div class="row">
+            <div class="one-half column category">
+                <h5 style="text-align:center">Model 12235 last pool (prediction)</h5>
+                 <script class="model" src="models/ambiguous_cases/12235_pred.json" type="application/vnd.jupyter.widget-state+json"></script>
+                <script type="application/vnd.jupyter.widget-view+json">
+                    {"version_major": 2, "version_minor": 0, "model_id": "bd89124c3a91457c840c4b5fa7edff60"}
+                </script>
+            </div>
+            <div class="one-half column category">
+                <h5 style="text-align:center">Model 12235 last pool (ground truth)</h5>
+                <script class="model" src="models/ambiguous_cases/12235_truth.json" type="application/vnd.jupyter.widget-state+json"></script>
+                <script type="application/vnd.jupyter.widget-view+json">
+                    {"version_major": 2, "version_minor": 0, "model_id": "14d714ea7dfd4c01ba437881f0f3985b"}
+                </script>
+            </div>
+            <table class="u-full-width">
+                <tbody class="surface-types-table">
+                    <tr>
+                        <td class="surface-types" style="background-color:red">Plane</td>
+                        <td class="surface-types" style="background-color:blue">Cylinder</td>
+                        <td class="surface-types" style="background-color:magenta">Cone</td>
+                        <td class="surface-types" style="background-color:purple">Torus</td>
+                        <td class="surface-types" style="background-color:black">BSpline</td>
+                        <td class="surface-types" style="background-color:orange">Sphere</td>
+                        <td class="surface-types" style="background-color:green">Revolution</td>
+                        <td class="surface-types" style="background-color:cyan">Extrusion</td>
+                        <td class="surface-types" style="background-color:yellow">Other</td>
+                    </tr>
+                </tbody>
+        </table>
+        </div>
     </div>
 
     <div class="docs-section" id="appendix">
