@@ -215,7 +215,28 @@
                 <figcaption>Edge class frequencies on 35K-edge mesh dataset</figcaption>
             </figure>
         </div>
-        <p>Surfaces in ABC dataset models are predominantly planes and cylinders, with less than 10% of the surfaces belonging to other classes. This imbalance in the
+        <ul>
+            <li>Most surfaces in ABC are planes are cylinders (>90%)</li>
+            <li>Training biases model towards overrepresented classes</li>
+            <li>Weighted loss function does not help, there's too few samples of other surfaces</li>
+            <li>Solution: Undersampling of planes & cylinders + augmentation with synthetic samples</li>
+            <li>Synthetic samples created in <i>gmsh</i> using surfaces with uniformly distributed random parameters</li>
+            <li>1st approach: Open meshes made of a single surface
+                <ul>
+                    <li>Fine adjustment of surface type occurrence</li>
+                    <li>Bad accuracy on boundaries: MeshCNN applies boundary-preserving edge collapses during pooling</li>
+                    <li>Samples are too simplistic, model cannot learn to identify class boundaries</li>
+                    <li>Most ABC models are closed meshes</li>
+                </ul>
+            </li>
+            <li>Final approach: Closed meshes made of multiple surface types
+                <ul>
+                    <li>Closer to ABC models</li>
+                    <li>Less control in surface type occurrence adjustment</li>
+                </ul>
+            </li>
+        </ul>
+        <!--<p>Surfaces in ABC dataset models are predominantly planes and cylinders, with less than 10% of the surfaces belonging to other classes. This imbalance in the
             surface class occurrence biases the model towards the overrepresented classes and impedes the learning of the underrepresented surface types.Experiments applying
             a weighted loss function to penalize more misclasiffications of the underrepresented classes show no noticeable improvement.<br>
             The class imbalance was addressed by resampling. Any model made of exclusively of planes and cylinders was discarded, hence downsampling these classes. Additionally, synthetic samples were
@@ -224,7 +245,7 @@
             1. MeshCNN applies boundary-preserving edge collapses during pooling. As a result, the prediction accuracy near the mesh boundary is severely affected<br>
             2. The model cannot learn to identify class boundaries with Synthetic samples made of a single surface.<br>
             Thefore, the final synthetic dataset was composed of closed meshes made of multiple surface types.
-        </p>
+        </p>-->
         <div class="row">
             <div class="one-half column category">
                 <h5 style="text-align:center">Open cone prediction (original size)</h5>
@@ -783,7 +804,7 @@
                         </tr>
                         <tr>
                             <th>Test accuracy</th>
-                            <td>85.6% (20 epochs)</td>
+                            <td>86.2% (20 epochs)</td>
                         </tr>
                 </table>
             </div>
