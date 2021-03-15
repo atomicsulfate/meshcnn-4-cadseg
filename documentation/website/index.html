@@ -76,25 +76,28 @@
         <p>
             In this project we've measured MeshCNN performance in a class segmentation problem, where the goal is to predict the segmentation of CAD model meshes
             into explictely parameterized surfaces. The CAD models used are a subset of the 1 million samples available in ABC Dataset<a href="#2">[2]</a>. As a result of
-            exercise we've identified some shortcomings in MeshCNN design and implementation, some of which were solved. Additionally, the results provide some insight into
-            to the issues that may be found on surface class segmentation tasks for CAD models.
+            this exercise we've identified shortcomings in MeshCNN design and implementation, some of which we solved. Additionally, the results provided some insight into
+            the issues that may be found on surface class segmentation tasks for CAD models.
         </p>
         <h4 class="subsection-heading">MeshCNN's ResUNet for class segmentation</h4>
         <p>
-            MeshCNN has different architectures for classification and segmentation. For segmentation,
-            it uses a UNet architecture with residual learning blocks.
+            UNet is a fully-convolutional neural network architecture original introduced for medical image segmentation <b>TODO: Add reference</b>. It's characterized by a
+            contractive path or encoder, where feature maps are convolved and pooled into progressively smaller resolutions (and hence larger receptive fields); followed by
+            and expansive path or decoder, where the encoded features are gradually unpooled to their original resolution. A hallmark of UNet architecture are they so called
+            "skip connections", with which the network convolves together feature maps of same resolution coming from the contractive and expansive paths ResUNets add residual blocks
+            to the UNet design in order to facilitate learning of linear mappings in deep neural networks <b>TODO: REFERENCE</b>.
         </p>
-        <figure>
+         <figure>
             <img class="u-max-full-width" src="images/MeshCNN.svg">
             <figcaption>MeshCNN ResUNet</figcaption>
         </figure>
         <div>
-            <p>MeshCNN uses mesh edges as primitives. For each each, it computes 5 input features:
+            <p>MeshCNN uses mesh edges as primitives. For each edge, it computes 5 input features <b>TODO: REF TO EQUATION AND IMAGE</b>:
             </p>
             <ul>
                 <li>Dihedral angle between two incident faces</li>
-                <li>2 opposite vertex angles</li>
-                <li>2 ratios of edge length wrt triangle height</li>
+                <li>The angles at the two vertices opposite to the edge</li>
+                <li>The ratio between the edge length and the triangle height for each incident face</li>
             </ul>
             <div class="u-pull-right" style="width:20%">
                 <figure>
@@ -110,12 +113,12 @@
             <p>All these features are relative and implicitly invariant to translation, rotation and unform scaling.
             </p>
         </div>
-        <p>Convolution is applied to the 1-ring neighbourhood of each edge, made of 5 edges (4 edges and itself). Edge
-            order invariance is ensure by applying symmetric functions:
+        <p>Convolution is applied to the 1-ring neighbourhood <b>TODO: Ref to image</b> of each edge, made of 5 edges (4 edges and itself). Edge
+            order invariance is ensure by applying symmetric functions to the neighbour edge features <b>TODO: Ref to equation</b>
         </p>
         <img style="display:block;margin:auto" width="50%" src="images/neighbourhood.svg">
         <div style="clear:both;display: block"/>
-         <p>In the pooling layer, a mesh is simplified to a target number of edges (model parameter) collapsing sequentially
+         <p>In a pooling layer <b>TODO: REF</b>, a mesh is simplified to a target number of edges (a model parameter) collapsing sequentially
              those edges with the smallest feature norm. A collapsed edge is removed and the features of the neighbouring
              edges are averaged by pairs. The correspondence between new and old edges is saved and used during unpooling to
              recover the original mesh structure.
@@ -133,17 +136,21 @@
                 <figcaption>ABC dataset model</figcaption>
             </figure>
         </div>
-        <ul>
-            <li>1M CAD models</li>
-            <li>Explicitely parameterized surfaces/curves</li>
-            <li>High-quality triangle meshes</li>
-        </ul>
+        <p>
+            The CAD models used to train and test MeshCNN belong to the ABC Dataset, which is a compilation of 1 million publicly available
+            models extracted from Onshape <b>TODO REF</b>. Each model is made of explicitely parameterized surfaces and curves, and it's defined as a Boundary
+            representation in STEP and Parasolid formats. The dataset comes together with a processing pipeline to generate meshes with high quality
+            triangulation in OBJ format as well as surface and curve labels for vertices and faces in YAML. We've only used the OBJ meshes provided
+            in the dataset for our initial experiments, remeshing the models with a lower resultion at a later stage using ABC processing tools in
+            order to reduce MeshCNN training times.
+        </p>
         <div style="clear:both;display: block"/>
     </div>
 
     <div class="docs-section" id="method">
         <h3 class="section-heading">Method</h3>
-        <p class="section-description"></p>
+        <p class="section-description">The work undertaken in this project was divided in two stages. First, we prepared small experiments to validate the setup, the changes we did in MeshCNN and to
+        learn any mesh preprocessing required by MeshCNN. Afterwards, the methodology was adapted with the lessons learned in the first experiments.</p>
         <h4 class="subsection-heading">MeshCNN improvements</h4>
         <p>Initial experiments showed that MeshCNN is not optimized to handle large meshes. The experiments in the
            original paper use datasets with small meshes, having at most a few thousand edges.<br><br>
