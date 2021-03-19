@@ -242,27 +242,6 @@
                 <figcaption>Edge class frequencies on 35K-edge mesh dataset</figcaption>
             </figure>
         </div>
-        <ul>
-            <li>Most surfaces in ABC are planes are cylinders (>90%)</li>
-            <li>Training biases model towards overrepresented classes</li>
-            <li>Weighted loss function does not help, there's too few samples of other surfaces</li>
-            <li>Solution: Undersampling of planes & cylinders + augmentation with synthetic samples</li>
-            <li>Synthetic samples created in <i>gmsh</i> using surfaces with uniformly distributed random parameters</li>
-            <li>1st approach: Open meshes made of a single surface
-                <ul>
-                    <li>Fine adjustment of surface type occurrence</li>
-                    <li>Bad accuracy on boundaries: MeshCNN applies boundary-preserving edge collapses during pooling</li>
-                    <li>Samples are too simplistic, model cannot learn to identify class boundaries</li>
-                    <li>Most ABC models are closed meshes</li>
-                </ul>
-            </li>
-            <li>Final approach: Closed meshes made of multiple surface types
-                <ul>
-                    <li>Closer to ABC models</li>
-                    <li>Less control in surface type occurrence adjustment</li>
-                </ul>
-            </li>
-        </ul>
         <p>Surfaces in ABC dataset models are predominantly planes and cylinders, with less than 10% of the surfaces belonging to other classes. This imbalance in the
             surface class occurrence biases the model towards the overrepresented classes and impedes the learning of the underrepresented surface types.Experiments applying
             a weighted loss function to penalize more misclassifications of the underrepresented classes showed no noticeable improvements.</p>
@@ -857,7 +836,7 @@
         <h3 class="section-heading">Discussion and Future Work</h3>
         <p>In this project we've evaluated the performance of MeshCNN predicting mesh segmentation by surface type in CAD models from ABC dataset. The outcome of the experiments helped us identify multiple
         root causes for the poor accuracy exhibited by the tested models, some intrinsic to the classification task at hand, others related to architectural and implementation shortcomings in MeshCNN.</p>
-        <h4 class="subsection-heading">1. CAD surface type imbalance and overlapping</h4>
+        <h4 class="subsection-heading">CAD surface type imbalance and overlapping</h4>
         <p>We've already established that the problem of segmenting ABC meshes by surface type suffers from class imbalance. More than 90% of the surfaces in ABC models are plane and cylinders, an imbalance that
         can probably be extrapolated to CAD models in general. But research <b>TODO: ADD REFS</b> indicates that it's class overlapping, a phenomenon highly correlated to class imbalance, what has a greater
         impact on classification performace. Certainly, surface classes have overlaps, where some surfaces types are a subset of more general ones:</p>
@@ -907,7 +886,7 @@
         </table>
         </div>
         <p>
-            The next two examples contain BSpline surfaces that are very similar to a torus and a sphere respectively, and as a result some of their edges are classified like that.
+            The next two examples contain BSpline surfaces that are very similar to a torus and a sphere respectively, and as a result some of their edges are classified as such.
         </p>
         <div class="row">
             <div class="one-half column category">
@@ -971,23 +950,38 @@
                 </tbody>
         </table>
         </div>
-        <h4 class="subsection-heading">2. MeshCNN CPU and memory performance bottlenecks</h4>
-        <ul>
-            <li>Memory bottleneck solved by using sparse matrices for edge collapse accounting in pooling/unpooling</li>
-            <li>Multiple research papers on mesh simplification on GPU, some using edge collapses <a href="#4">[4]</a> <a href="#5">[5]</a></li>
-        </ul>
-        <!--<p>The success of CNN and other deep neural networks in the last decade has been enabled by the availability of large datasets and the capacity</p>-->
-        <h4 class="subsection-heading">3. Mesh pooling limitations</h4>
-        <ul>
-            <li>Boundary-preserving edge collapsing inhibits learning segmentation near boundaries in open meshes</li>
-            <li>Mesh can be simplified down to slightly less half their original edge count (vs 10% for images)
-                <ul>
-                    <li>Some surface types can be easily identified by their local curvature: sphere, cylinder, cone, torus</li>
-                    <li>General extrusion and revolution surfaces are more general concepts, not identifiable by local features, CNN must pool them until they fit the receptive field</li>
-                </ul>
-            </li>
-            <li>Non-uniform pooling caused by adaptive edge collapsing further inhibits the application of larger receptive fields to some mesh regions</li>
-        </ul>
+        <h4 class="subsection-heading">MeshCNN CPU and memory performance bottlenecks</h4>
+        <p>MeshCNN implementation of mesh pooling suffers from memory and CPU bottlenecks. We've greatly reduced the memory consumption during pooling by using sparse matrices for
+        edge collapse bookeping. Additionally, to achieve faster training times, we've also modified MeshCNN to use Pytorch's distributed training. However, MeshCNN remains essentially CPU-bound, and the speedup offered by
+        distributed training is limited by inter-node communication penalities. Fine-grained GPU parallelization in contrast scales better with sample and batch size and it's one of main reasons deep learning has achieved great
+        results in the last decade.<br>
+        There's multiple research papers on GPU-parallelized mesh simplification algorithms, some of which use edge collapses <a href="#4">[4]</a> <a href="#5">[5]</a> and could be therefore implemented
+        in MeshCNN. A full in-GPU MeshCNN implementation would reduce training times considerably, accelerating training with more agressive data augmentation techniques (remeshing, vertex perturbation) that can potentially improve
+        the generalization error.
+        </p>
+        <h4 class="subsection-heading">Mesh pooling limitations</h4>
+        <p>
+            The core concept behind MeshCNN is to extrapolate the convolution and pooling operations powering CNNs to 3D meshes. However MeshCNN's edge-oriented pooling exhibits some limitations that its pixel-based counterpart
+            does not have.
+        </p>
+        <p>
+            MeshCNN mesh pooling is implemented using boundary-preserving edge collapsing, and thus edges in the 1-ring neighbourhoods at mesh boundaries are never collapsed. A reason behind this design choice may be that a mesh boundary
+            could have information relevant to the classification tasks (e.g. classification of open meshes representing polygons). However, we've shown how in segmentation tasks this policy cripples the edge classification accuracy near
+            boundaries. A potential future line of investigation could evaluate the impact of unconstrained edge collapsing on MeshCNN performance for segmentation tasks on open meshes.
+        </p>
+        <p>
+            A more general limitation in mesh pooling is that the target mesh size may only be achieved if the necessary amount of edge collapses can be performed without breaking the mesh manifold. Image pooling on the contrary doesn't have
+            any limit, and in fact images are typically pooled down to much smaller sizes (e.g. 10% of the original size) in order to learn global features. For meshes the minimum achievable pooling size varies between samples, but lies around
+            40% of the original size for ABC dataset models. This means that mesh features at the global scale cannot be learned by MeshCNN, since they're never pooled down enough to fit in the CNN receptive field (i.e. the convolution filter size).
+            While some surfaces classes may be identifiable out of local features such as local curvature (e.g. sphere, cylinder, cone, torus), more general surface types, like revolution and extrusion, may only be characterized by global properties
+            (e.g. axial symmetry in revolution surfaces). This inability to learn global features may be further exacerbated by MeshCNN adaptive edge collapsing policy, by which pooling happens non-uniformly across the mesh, thus increasing the chances that
+            large scale features are missed.
+        </p>
+        <p>
+           The following example shows clearly how after the last pooling stage most of the edge collapses were done at the planar surfaces, leaving many of the original edges in the extrusion surfaces intact. Features calculated for the unpooled edges are therefore strictly
+            local and as such indistinguishable from those that would be produced for a cylindrical surface. The global features of the extrusion, namely, the relation between the two planar surfaces at both ends of the extrusion and the extrusion surface itself,
+            remains mostly out of reach of the model receptive field.
+        </p>
         <div class="row">
             <div class="one-half column category">
                 <h5 style="text-align:center">Model 12235 last pool (prediction)</h5>
