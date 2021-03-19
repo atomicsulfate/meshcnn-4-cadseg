@@ -13,7 +13,7 @@ dependencies:
   - blas=1.0=mkl
   - bleach=3.2.1=pyh9f0ad1d_0
   - ca-certificates=2020.12.5=ha878542_0
-  - certifi=2020.12.5=py36h5fab9bb_0
+  - certifi=2020.12.5=py36h5fab9bb_1
   - cffi=1.14.0=py36h2e261b9_0
   - cudatoolkit=10.1.243=h6bb024c_0
   - cycler=0.10.0=py36_0
@@ -78,6 +78,7 @@ dependencies:
   - notebook=6.1.5=py36h5fab9bb_0
   - numpy=1.19.4=py36h8732dcd_1
   - olefile=0.46=py36_0
+  - openmesh-python=1.1.3=py36hc8e3772_0
   - openssl=1.1.1i=h27cfd23_0
   - pandoc=2.11.2=h36c2ea0_0
   - pandocfilters=1.4.2=py_1

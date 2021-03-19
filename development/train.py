@@ -79,7 +79,7 @@ if __name__ == '__main__':
     opt = TrainOptions().parse()
     numGPUs = len(opt.gpu_ids)
     if 'LOCAL_RANK' in os.environ:
-        local_rank = os.environ['LOCAL_RANK']
+        local_rank = int(os.environ['LOCAL_RANK'])
     else:
         # Non dist mode, set dummy env variables.
         local_rank = 0

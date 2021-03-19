@@ -149,8 +149,10 @@
 
     <div class="docs-section" id="method">
         <h3 class="section-heading">Method</h3>
-        <p class="section-description">The work undertaken in this project was divided in two stages. First, we prepared small experiments to validate the setup, the changes we did in MeshCNN and to
-        learn any mesh preprocessing required by MeshCNN. Afterwards, the methodology was adapted with the lessons learned in the first experiments.</p>
+        <p class="section-description"> The methodology followed to evaluate MeshCNN's performance on surface type segmentation for CAD models was iteratively refined through a set of initial experiments that helped us finding
+            MeshCNN limitations as well as the required ABC dataset preprocessing steps for the classification task at hand. Some of the identified MeshCNN limitations were addressed here, either changing MeshCNN implementation or circumventing them
+            through data preprocessing; others were listed for future work.
+        </p>
         <h4 class="subsection-heading">MeshCNN improvements</h4>
         <p>Initial experiments showed that MeshCNN is not optimized to handle large meshes. The experiments in the
            original paper use datasets with small meshes, having at most a few thousand edges.<br><br>
@@ -221,7 +223,7 @@
             <li>Meshing error controlled by setting custom face size constraints in gmsh (MeshSizeFromCurvature)</li>
             <li>10K meshes obtained from the first 170K ABC models</li>
         </ul>
-        <!--<p>ABC models are fairly large, some of them made of thousands of surface patches. The dataset comes with high resolution meshes, going from a few thousand edges to
+        <p><b>TODO: REWRITE (remove VC dim)</b>ABC models are fairly large, some of them made of thousands of surface patches. The dataset comes with high resolution meshes, going from a few thousand edges to
             hundreds of thousands. MeshCNN UNet architecture does class segmentation by applying a succession of convolution and pooling operations to the input features. Logically,
             the larger the input meshes are, the more conv+pool stages are needed in the architecture.
             The PAC framework estimates a minimum training sample size of O((VC + log(1/eta))/eps) to ensure the test error is not more than eps w.r.t the
@@ -232,7 +234,7 @@
             original surfaces had to be limited (using gmsh's element size setting MeshSizeFromCurvature). The remesh was attempted for the first 100K ABC models, from which only ~10K could be remeshed
             into 2K meshes within the error bounds. Since gmsh cannot control the exact size of the output mesh, a 2% tolerance in the final #edges was applied, accepting only meshes with #edges in range
             (1960-2000). Meshes smaller than target size are padded with invalid values during training, ignoring their contribution during backward propagation.
-        </p>-->
+        </p>
         <h4 class="subsection-heading">Dataset augmentation</h4>
         <div class="u-pull-right" style="width:50%; margin-left:20px">
             <figure>
@@ -261,16 +263,19 @@
                 </ul>
             </li>
         </ul>
-        <!--<p>Surfaces in ABC dataset models are predominantly planes and cylinders, with less than 10% of the surfaces belonging to other classes. This imbalance in the
+        <p>Surfaces in ABC dataset models are predominantly planes and cylinders, with less than 10% of the surfaces belonging to other classes. This imbalance in the
             surface class occurrence biases the model towards the overrepresented classes and impedes the learning of the underrepresented surface types.Experiments applying
-            a weighted loss function to penalize more misclasiffications of the underrepresented classes show no noticeable improvement.<br>
+            a weighted loss function to penalize more misclassifications of the underrepresented classes showed no noticeable improvements.</p>
+        <p>
             The class imbalance was addressed by resampling. Any model made of exclusively of planes and cylinders was discarded, hence downsampling these classes. Additionally, synthetic samples were
-            created for the other classes to upsample them. The synthetic samples were created using gmsh to mesh parametric surfaces with uniformly distributed random parameters.<br>
-            The first synthetic samples were open meshes made of a single surface, thus having a fine control in the class upsampling. This approach has two problems: <br>
-            1. MeshCNN applies boundary-preserving edge collapses during pooling. As a result, the prediction accuracy near the mesh boundary is severely affected<br>
-            2. The model cannot learn to identify class boundaries with Synthetic samples made of a single surface.<br>
-            Thefore, the final synthetic dataset was composed of closed meshes made of multiple surface types.
-        </p>-->
+            created for the other classes to upsample them. The synthetic samples were created using <i>gmsh</i> <b>TODO: ADD REF</b> to mesh parametric surfaces with uniformly distributed random parameters.<br>
+            The first synthetic samples were open meshes made of a single surface, thus having a fine control in the class upsampling. This approach had multiple problems:
+        </p>
+        <ol>
+            <li>MeshCNN applies boundary-preserving edge collapses during pooling. As a result, the prediction accuracy near the mesh boundary is severely affected</li>
+            <li>Samples are too simplistic, the classifier cannot learn to identify class boundaries with synthetic samples made of a single surface.</li>
+            <li>Most ABC models are closed meshes.</li>
+        </ol>
         <div class="row">
             <div class="one-half column category">
                 <h5 style="text-align:center">Open cone prediction (original size)</h5>
@@ -303,6 +308,12 @@
                 </tbody>
             </table>
         </div>
+
+        <p>
+            Thefore, the final synthetic dataset was composed of closed meshes made of multiple surface types, much more similar to (albeit still simpler than) ABC models, but at expense of losing the fine-grained control of over
+            the class occurrence in the augmented dataset.
+        </p>
+
         <div class="row">
             <div class="one-half column category">
                 <h5 style="text-align:center">Closed cone ground truth</h5>
@@ -447,7 +458,7 @@
             <h4 class="subsection-heading">Ice breaker</h4>
             <div>
                 <div class="u-pull-right-third">
-                    <table class="u-full-width">
+                    <table class="experiment-params-table">
                             <tr>
                                 <th>Train set size</th>
                                 <td>262</td>
@@ -461,11 +472,11 @@
                                 <td><=5000 edges</td>
                             </tr>
                             <tr>
-                                <th>Convolution #channels</th>
+                                <th>Conv. channels</th>
                                 <td>32, 64, 128, 256</td>
                             </tr>
                             <tr>
-                                <th>Pooling target sizes</th>
+                                <th>Pooling sizes</th>
                                 <td>4000, 3000, 1800</td>
                             </tr>
                             <tr>
@@ -486,9 +497,9 @@
                     used in <a href="#1">[1]</a>, with the following objectives:
                 </p>
                 <ul>
-                    <li>Validate training setup, label generation in particular</li>
-                    <li>Early feasibility check</li>
-                    <li>Identify potential changes required in MeshCNN and dataset preprocessing</li>
+                    <li>Validate the training setup, in particular the transformation of label data into the format expected by MeshCNN.</li>
+                    <li>Identify potential changes required in MeshCNN and dataset preprocessing.</li>
+                    <li>Verify the feasibility of using MeshCNN for surface class segmentation on ABC models.</li>
                 </ul>
                 <p>As a result of the experiment, we identified the memory and processing bottlenecks as well as required preprocessing steps
                 explained in the <a href="#method">methodology</a>.</p>.
@@ -520,7 +531,7 @@
         <div>
             <h4 class="subsection-heading">35K-edge mesh dataset</h4>
             <div class="u-pull-right-third">
-                    <table class="u-full-width">
+                    <table class="experiment-params-table">
                             <tr>
                                 <th>Train set size</th>
                                 <td>862</td>
@@ -534,11 +545,11 @@
                                 <td>[33000,35000] edges</td>
                             </tr>
                             <tr>
-                                <th>Convolution #channels</th>
+                                <th>Conv. channels</th>
                                 <td>32, 64, 128, 256</td>
                             </tr>
                             <tr>
-                                <th>Pooling target sizes</th>
+                                <th>Pooling sizes</th>
                                 <td>20000, 15000, 10000</td>
                             </tr>
                             <tr>
@@ -555,9 +566,11 @@
                             </tr>
                     </table>
             </div>
-            <p>Onced the issues observed in the first experiment were solved a second larger dataset was compiled with meshes of
-                sizes close to the ABC average. The meshes in the dataset have size differences (in #edges) of at most 10%, since
-                mixing mesh of very different sizes may have an impact on the network performance (as is the case with CNNs for images).
+            <p>Onced the issues observed in the first experiment were solved, we compiled a larger dataset with meshes of
+                sizes close to the ABC average. We constrained the size difference (in edge count) among meshes in this dataset to be at most 10%, since
+                training with meshes of very different sizes could potentially affect the classifier performance as it does to CNNs for images.<br>
+                The model learns to predict the two most frequent classes (plane and cylinder surfaces), but not the rest. The optimization seems to stay at a local minima in the loss
+                function, most probably due to the imbalance in the class occurrence.
             </p>
             <div style="clear:both;display: block"/>
             <div class="row">
@@ -622,14 +635,11 @@
                     </tbody>
             </table>
             </div>
-             <p> The model learns to predict the two most frequent classes (plane and cylinder surfaces), but no the rest. The optimization seems to stay at a local minima in the loss
-                function, most probably due to the imbalance in the class occurrence.
-            </p>
         </div>
         <div style="clear:both;display: block"/>
-        <h4 class="subsection-heading">Remehesed & resampled dataset</h4>
+        <h4 class="subsection-heading">Remeshed & resampled dataset</h4>
             <div class="u-pull-right-third">
-                <table class="u-full-width">
+                <table class="experiment-params-table">
                         <tr>
                             <th>Train set size</th>
                             <td>4000</td>
@@ -643,11 +653,11 @@
                             <td>[1920-2000]</td>
                         </tr>
                         <tr>
-                            <th>Convolution #channels</th>
+                            <th>Conv. channels</th>
                             <td>32, 64, 128, 256, 512</td>
                         </tr>
                         <tr>
-                            <th>Pooling target sizes</th>
+                            <th>Pooling sizes</th>
                             <td>1600, 1280, 1024, 850</td>
                         </tr>
                         <tr>
@@ -664,7 +674,8 @@
                         </tr>
                 </table>
             </div>
-            <p>This dataset contains 5000 ABC models sampled so they don't contain exclusively plane and cylinder surfaces, and remeshed to 2000 edges. The model has an additional conv+pooling stage and uses AdamW optimizer.
+            <p>The dataset for this experiment contains 5000 ABC models sampled so they don't contain exclusively plane and cylinder surfaces, and remeshed to 2000 edges. Compared to the previous experiments, the model used here
+                has an additional convolution and pooling stage and adds weight decay regularization to the optimizer (AdamW).<br>
                 Even with the reduced mesh size, the increased capacity and the surface class resampling, the model shows a poor accuracy prediciting surfaces other than planes and cylinders.
             </p>
         <div style="clear:both;display: block"/>
@@ -796,9 +807,9 @@
                 <img class="u-max-full-width" src="images/5K_dataset_results.svg">
                 <figcaption>Surface type frequency and prediction accuracy</figcaption>
             </figure>
-        <h4 class="subsection-heading">Remeshed, resampled and augmented</h4>
+        <h4 class="subsection-heading">Remeshed, resampled and augmented dataset</h4>
         <div class="u-pull-right-third">
-                <table class="u-full-width">
+                <table class="experiment-params-table">
                         <tr>
                             <th>Train set size</th>
                             <td>5104(ABC)+5100(synth)</td>
@@ -812,11 +823,11 @@
                             <td>[1960-2000]</td>
                         </tr>
                         <tr>
-                            <th>Convolution #channels</th>
+                            <th>Conv. channels</th>
                             <td>32, 64, 128, 256, 512</td>
                         </tr>
                         <tr>
-                            <th>Pooling target sizes</th>
+                            <th>Pooling sizes</th>
                             <td>1600, 1280, 1024, 850</td>
                         </tr>
                         <tr>
@@ -845,21 +856,25 @@
     <div class="docs-section" id="discussion">
         <h3 class="section-heading">Discussion and Future Work</h3>
         <p>In this project we've evaluated the performance of MeshCNN predicting mesh segmentation by surface type in CAD models from ABC dataset. The outcome of the experiments helped us identify multiple
-        root causes for the poor accuracy exhibited by the tested models, some intrinsic to the problem definition, others related to architectural and implementation shortcomings of MeshCNN.</p>
-        <h4 class="subsection-heading">1. CAD Surface type imbalance and overlapping</h4>
-        <!--<p>The problem of segmenting CAD meshes by surface type suffers from class imbalance and overlapping. As already discussed, more than 90% of the surfaces in ABC models are plane and cylinders, an imbalance that
-        can probably be extrapolated to CAD models in general. </p>-->
+        root causes for the poor accuracy exhibited by the tested models, some intrinsic to the classification task at hand, others related to architectural and implementation shortcomings in MeshCNN.</p>
+        <h4 class="subsection-heading">1. CAD surface type imbalance and overlapping</h4>
+        <p>We've already established that the problem of segmenting ABC meshes by surface type suffers from class imbalance. More than 90% of the surfaces in ABC models are plane and cylinders, an imbalance that
+        can probably be extrapolated to CAD models in general. But research <b>TODO: ADD REFS</b> indicates that it's class overlapping, a phenomenon highly correlated to class imbalance, what has a greater
+        impact on classification performace. Certainly, surface classes have overlaps, where some surfaces types are a subset of more general ones:</p>
         <ul>
-            <li>>90% surfaces in CAD models are planes or cylinders</li>
-            <li>Class surfaces are overlapped
-                <ul>
-                    <li>Cylinder, Cone, Torus, Sphere \( \subset \) Revolution</li>
-                    <li>Cylinder, Cone, Torus, Sphere \( \subset \) BSpline</li>
-                    <li>Cylinder \( \subset \) Extrusion</li>
-                    <li>Plane \( \cap \) Extrusion \( \neq \emptyset \)</li>
-                </ul>
-            </li>
+            <li>Cylinder, Cone, Torus, Sphere \( \subset \) Revolution</li>
+            <li>Cylinder, Cone, Torus, Sphere \( \subset \) BSpline</li>
+            <li>Cylinder \( \subset \) Extrusion</li>
+            <li>Plane \( \cap \) Extrusion \( \neq \emptyset \) (the surfaces resulting from the extrusion of a polygon are planes)</li>
         </ul>
+        <p>
+            The most important consequence of surface class overlapping is the presence of ambiguous labelling: concrete, simpler surface class (e.g. cylinder) are sometimes generated in CAD model using a more abstract
+            parameterization (e.g. a revolution surface) and thus labelled likewise.
+        </p>
+        <p>
+            The following CAD model represents a perfect pathological case, where planar surfaces, predicted as planes by the classifier, were actually created using BSplines. The other surfaces were result of a revolution,
+            however their edges are predicted to belong to an extrusion or cylinder, and in fact they could have been created out of those surfaces too.
+        </p>
         <div class="row">
             <div class="one-half column category">
                 <h5 style="text-align:center">Model 18963 (prediction)</h5>
@@ -891,6 +906,9 @@
                 </tbody>
         </table>
         </div>
+        <p>
+            The next two examples contain BSpline surfaces that are very similar to a torus and a sphere respectively, and as a result some of their edges are classified like that.
+        </p>
         <div class="row">
             <div class="one-half column category">
                 <h5 style="text-align:center">Model 1966 (prediction)</h5>

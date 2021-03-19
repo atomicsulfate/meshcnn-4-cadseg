@@ -925,3 +925,23 @@ hr {
     display: table;
     clear: both
 }
+
+.experiment-params-table {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid black;
+    margin-left: 1rem
+}
+
+.experiment-params-table thead,
+.experiment-params-table td
+ {
+    border: 1px solid black;
+    padding: 5px
+}
+
+.experiment-params-table th {
+    background-color: #E1E1E1;
+    border: 1px solid black;
+    padding: 5px
+}
