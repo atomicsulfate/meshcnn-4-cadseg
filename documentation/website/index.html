@@ -204,36 +204,18 @@
                 </div>
             </div>
         <h4 class="subsection-heading">Dataset remeshing</h4>
-        <ul>
-            <li>ABC meshes have very different sizes, from 5K-200K edges</li>
-            <li>MeshCNN needs input meshes of similar size</li>
-            <li>Datasets of meshes of average size (~35K edges) compiled from ABC dataset are too small (~1K samples out of first 10K ABC models)</li>
-            <li>Training times for 35K-edge meshes are impractical</li>
-        <li>PAC learning framework defines a worst case training set size <i>m</i> for a classifier with VC dimension <i>d</i> to ensure a maximum
-            test error deviation \(\epsilon\) with a certainty of \( 1 - \eta \):
-        \[
-            m = \mathcal{O}\big(\frac{d + \log(\frac{1}{\eta})}{\epsilon}\big)
-        \]</li>
-            <li>The VC dimension of a (binary) NN classifier is \(\mathcal{O}(|w|)\)</li>
-            <li>MeshCNN has 2.2M weights in its original config (4 conv layers)</li>
-            <li>The larger the input meshes, the more conv. layers are needed</li>
-            <li>Worst-case training set size for small meshes (~1K edges) is <b> >2M samples</b></li>
-            <li>Solution: Remesh ABC models using cadmesh to get a target size of 2K edges</li>
-            <li>Most models are too large to fit into 2K edges with reasonable error w.r.t original surfaces</li>
-            <li>Meshing error controlled by setting custom face size constraints in gmsh (MeshSizeFromCurvature)</li>
-            <li>10K meshes obtained from the first 170K ABC models</li>
-        </ul>
-        <p><b>TODO: REWRITE (remove VC dim)</b>ABC models are fairly large, some of them made of thousands of surface patches. The dataset comes with high resolution meshes, going from a few thousand edges to
-            hundreds of thousands. MeshCNN UNet architecture does class segmentation by applying a succession of convolution and pooling operations to the input features. Logically,
-            the larger the input meshes are, the more conv+pool stages are needed in the architecture.
-            The PAC framework estimates a minimum training sample size of O((VC + log(1/eta))/eps) to ensure the test error is not more than eps w.r.t the
-            training error with a confidence of (1-eta). The VC-dimension of a binary NN classifier is O(|w|), w being the #weights. MeshCNN has ~2.2M weights in the original paper configuration
-            (4 conv layers of 32,64,128,256 channels). The #weights increases proportionately with the number of conv channels and so does therefore the theorical min. training size.
-            Given the performance bottleneck cause by in-CPU edge collapsing, training average ABC mesh sizes (~35K) in MeshCNN becomes impractical.<br>
-            We've therefore remeshed ABC models using cadmesh to get a target size of 2000 edges. Since almost all ABC original meshes are larger than that, the error of the mesh w.r.t to the model
-            original surfaces had to be limited (using gmsh's element size setting MeshSizeFromCurvature). The remesh was attempted for the first 100K ABC models, from which only ~10K could be remeshed
-            into 2K meshes within the error bounds. Since gmsh cannot control the exact size of the output mesh, a 2% tolerance in the final #edges was applied, accepting only meshes with #edges in range
-            (1960-2000). Meshes smaller than target size are padded with invalid values during training, ignoring their contribution during backward propagation.
+        <p> ABC models are published with meshes of very different sizes, ranging from 2000 edges and a few surface patches, up to 200 thousand edges and thousands of surfaces. However, MeshCNN relies on input
+            meshes having a similar number of edges. Larger meshes need to be pooled further and at more levels than smallers ones, since they need to capture features at more scales in order detect surface patches
+            of many sizes. Therefore a given MeshCNN parametrization (number of pooling layers and target sizes) that's optimal for meshes of some size will probably be inadequate for smaller meshes, or even impracticable if
+            those smaller meshes cannot be simplified to the specified target sizes.
+        </p>
+        <p>
+            In our first experiments we used the meshes in OBJ format provided as part of ABC dataset, taking samples of a target number of edges with a small error margin (5%). Since ABC meshes have very high resolution,
+            sampling meshes of the smallest sizes (5000 edges or fewer) results in very small datasets (3% of the whole ABC dataset) consisting of very simple models made of a few plane and cylindrical surfaces. To obtain subsets of
+            acceptable size and complexity, one has to sample meshes around 35000 edges in size (average size of ABC models). However, learning segmentation on larger meshes requires more complex models (more convolution and pooling stages),
+            which in turn need larger training sets to obtain the same generalization error than simpler ones. Thus, in order to have reasonable training times, we remeshed ABC models to a target size of 2000 edges (+/- 2% tolerance) using <i>cadmesh</i>, the
+            tool used to generate the original ABC meshes. We limited the meshing error with respect to the original CAD surfaces by setting curvature-dependent face size constraints (gmsh's <a href="https://gmsh.info/doc/texinfo/gmsh.html#index-Mesh_002eMeshSizeFromCurvature">MeshSizeFromCurvature</a>).
+            That way we obtained more than 10000 meshes out of the first 170000 ABC samples.
         </p>
         <h4 class="subsection-heading">Dataset augmentation</h4>
         <div class="u-pull-right" style="width:50%; margin-left:20px">
