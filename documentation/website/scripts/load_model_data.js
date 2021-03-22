@@ -7,8 +7,9 @@ for(var i=0; i < scripts.length; ++i) {
        if (!response.ok) {
            throw new Error("HTTP error " + response.status);
        }
-       return response.text();
+       return  response.text();
     }).then(text => {
+           console.log(`Loaded script with size ${text.length}`);
         script.innerHTML = text;
     });
 }
