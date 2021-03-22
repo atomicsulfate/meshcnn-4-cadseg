@@ -1,4 +1,4 @@
-<!doctype html><html class="no-js"><head><meta charset="utf-8"><title>Project Title</title><meta name="description" content=""><meta name="viewport" content="width=device-width">
+<!doctype html><html class="no-js"><head><meta charset="utf-8"><title>Surface class segmentation with MeshCNN</title><meta name="description" content=""><meta name="viewport" content="width=device-width">
 <!-- Place favicon.ico and apple-touch-icon.png in the root directory -->
 <link href="http://fonts.googleapis.com/css?family=Raleway:300,400,600" rel="stylesheet" type="text/css">
 <link rel="stylesheet" type="text/css" href="style.css">
@@ -48,85 +48,83 @@
 
     <section class="header" id="abstract">
         <h2 class="title">Surface class segmentation in CAD models with MeshCNN</h2>
-        <h6>Project by Andrés Mandado (<a href="mailto:mandadoalmajano@campus.tu-berlin.de">mandadoalmajano@campus.tu-berlin.de"</a>)
+        <h6>Project by <a href="mailto:mandadoalmajano@campus.tu-berlin.de">Andrés Mandado</a><br>
+            Tutor: <a href="mailto:kohlbrenner@tu-berlin.de">Maximilian Kohlbrenner</a>
         </h6>
-
         <div class="row">
 <!--            <div class="one column category" style="text-align: center;">-->
 <!--                <h5 class="docs-header">Teaser Image</h5>-->
                 <img class="u-max-full-width" src="images/teaser.jpg">
                     <p  style="text-align: justify;">There's been multiple approaches trying to extrapolate convolutional neural networks
-                        to irregular 3D data. MeshCNN<a href="#1">[1]</a> is an innovative framework to build classifiers
+                        to irregular 3D data. MeshCNN<a href="#MeshCNN">[1]</a> is an innovative framework to build classifiers
                         out of convolution and pooling operations designed specifically to work with edge features in 3D meshes. In this project,
-                        we've evaluated the performance of MeshCNN segmenting meshes of CAD models into their constituent surface types.</p>
+                        we evaluate the performance of MeshCNN segmenting meshes of CAD models into their constituent surface types.</p>
         </div>
     </section>
 
     <div class="docs-section" id="intro">
         <h3 class="section-heading">Introduction</h3>
         <p>
-            CNNs have been successfully applied for classification and segmentation of regular data such as images, natural language or time series
-        <b>TODO: how are NL and time series regular</b>. Their use on irregular 3D data such as point clouds or meshes is however not straightforward,
-        since convolution and pooling operations are only defined for data that's uniformly distributed across dimensions. In contrast to previous attempts
-        to workaround this limitation by transforming 3D data into regular representations <b>(TODO: ADD REFS)</b>, MeshCNN redefines convolution and pooling
-        operations so that they're directly applicable to mesh edges. MeshCNN authors built two different architectures out of these primitives: a mesh classifier,
-        with a typical design following a succession of convolution and pooling layers ending up in a fully connected part; and a fully-convolutional ResUnet
+            CNNs have been successfully applied for classification and segmentation of regular data such as images, natural language or time series.
+        Their use on irregular 3D data such as point clouds or meshes is however not straightforward,
+        since convolution and pooling operations are only defined for data that's uniformly distributed across dimensions. In contrast to previous attempts <a href="#Su15">[2]</a><a href="#Wu15">[3]</a>
+        to workaround this limitation by transforming 3D data into regular representations, MeshCNN redefines convolution and pooling
+        operations so that they're directly applicable to mesh edges. MeshCNN counts with two different architectures built out of these primitives: a mesh classifier,
+        with a typical design of stacked convolution and pooling layers ending up in a fully connected part; and a fully-convolutional ResUnet
         architecture for class segmentation.
         </p>
         <p>
-            In this project we've measured MeshCNN performance in a class segmentation problem, where the goal is to predict the segmentation of CAD model meshes
-            into explictely parameterized surfaces. The CAD models used are a subset of the 1 million samples available in ABC Dataset<a href="#2">[2]</a>. As a result of
-            this exercise we've identified shortcomings in MeshCNN design and implementation, some of which we solved. Additionally, the results provided some insight into
-            the issues that may be found on surface class segmentation tasks for CAD models.
+            In this project we measure MeshCNN performance in a class segmentation problem, where the goal is to predict the segmentation of CAD model meshes
+            into explictely parameterized surfaces. The CAD models used are a subset of the 1 million samples available in ABC Dataset<a href="#ABC">[4]</a>. As a result of
+            this exercise we identify shortcomings in MeshCNN design and implementation, solving some of them and leaving others for <a href="#discussion">future work</a>. Additionally, the outcome of our
+            experiments provides some insight into the issues that may be found on surface class segmentation tasks for CAD models.
         </p>
         <h4 class="subsection-heading">MeshCNN's ResUNet for class segmentation</h4>
         <p>
-            UNet is a fully-convolutional neural network architecture original introduced for medical image segmentation <b>TODO: Add reference</b>. It's characterized by a
+            UNet is a fully-convolutional neural network architecture originally designed for medical image segmentation <a href="#UNet">[5]</a>. It's characterized by a
             contractive path or encoder, where feature maps are convolved and pooled into progressively smaller resolutions (and hence larger receptive fields); followed by
-            and expansive path or decoder, where the encoded features are gradually unpooled to their original resolution. A hallmark of UNet architecture are they so called
-            "skip connections", with which the network convolves together feature maps of same resolution coming from the contractive and expansive paths ResUNets add residual blocks
-            to the UNet design in order to facilitate learning of linear mappings in deep neural networks <b>TODO: REFERENCE</b>.
+            and expansive path or decoder, where the encoded features are gradually unpooled to their original resolution. Another hallmark of the UNet architecture are the so called
+            "skip connections", with which the network convolves together feature maps of same resolution coming from the contractive and expansive paths. ResUNets <a href="#ResUNet">[6]</a> add residual blocks
+            to the UNet design in order to facilitate learning of linear mappings in deep neural networks.
         </p>
          <figure>
             <img class="u-max-full-width" src="images/MeshCNN.svg">
             <figcaption>MeshCNN ResUNet</figcaption>
         </figure>
         <div>
-            <p>MeshCNN uses mesh edges as primitives. For each edge, it computes 5 input features <b>TODO: REF TO EQUATION AND IMAGE</b>:
-            </p>
-            <ul>
-                <li>Dihedral angle between two incident faces</li>
-                <li>The angles at the two vertices opposite to the edge</li>
-                <li>The ratio between the edge length and the triangle height for each incident face</li>
-            </ul>
-            <div class="u-pull-right" style="width:20%">
+             <div class="u-pull-right" style="width:20%">
                 <figure>
                     <img class="u-max-full-width" src="images/input_features.svg">
-                    <figcaption>Input Edge Features</figcaption>
+                    <figcaption>Input Edge Features<a href="#MeshCNN">[1]</a></figcaption>
                 </figure>
                 <figure>
                     <img class="u-max-full-width" src="images/mesh_conv.png">
-                    <figcaption>Mesh Convolution</figcaption>
+                    <figcaption>Mesh Convolution<a href="#MeshCNN">[1]</a></figcaption>
                 </figure>
             </div>
+           <p>MeshCNN uses mesh edges as primitives. For each edge, it computes 5 input features:
+            </p>
             <img style="display:block;margin:auto" width="50%" src="images/input_vector.svg">
+             <ul>
+                <li>Dihedral angle between two incident faces (\(\phi\))</li>
+                <li>The angles at the two vertices opposite to the edge (\(\alpha_{1}, \alpha_{2}\))</li>
+                <li>The ratio between the edge length and the triangle height for each incident face (\(\frac{\mid e\mid}{\mid h_{1}\mid}, \frac{\mid e\mid}{\mid h_{2}\mid}\))</li>
+            </ul>
             <p>All these features are relative and implicitly invariant to translation, rotation and unform scaling.
             </p>
         </div>
-        <p>Convolution is applied to the 1-ring neighbourhood <b>TODO: Ref to image</b> of each edge, made of 5 edges (4 edges and itself). Edge
-            order invariance is ensure by applying symmetric functions to the neighbour edge features <b>TODO: Ref to equation</b>
+        <p>Convolution is applied to the 1-ring neighbourhood of each edge, made of 5 edges (4 neighbours and itself). Edge
+            order invariance is ensured by applying symmetric functions to the neighbour edge features:
         </p>
-        <img style="display:block;margin:auto" width="50%" src="images/neighbourhood.svg">
+        <img style="display:block;margin:auto;margin-bottom:3rem" width="50%" src="images/neighbourhood.svg">
         <div style="clear:both;display: block"/>
-         <p>In a pooling layer <b>TODO: REF</b>, a mesh is simplified to a target number of edges (a model parameter) collapsing sequentially
-             those edges with the smallest feature norm. A collapsed edge is removed and the features of the neighbouring
-             edges are averaged by pairs. The correspondence between new and old edges is saved and used during unpooling to
-             recover the original mesh structure.
+         <p>In a pooling layer, a mesh is simplified to a target number of edges (a model parameter) collapsing sequentially those edges with the smallest feature norm. A collapsed edge is removed and the features of the neighbouring
+             edges are averaged by pairs. The correspondence between new and old edges is saved and used during unpooling to recover the original mesh structure.
         </p>
         <div style="width:50%; margin:auto">
             <figure>
                 <img height="100%" width="100%" src="images/mesh_pool_unpool.png">
-                <figcaption>Mesh Pooling/Unpooling</figcaption>
+                <figcaption>Mesh Pooling/Unpooling<a href="#MeshCNN">[1]</a></figcaption>
             </figure>
         </div>
         <h4 class="subsection-heading">ABC Dataset</h4>
@@ -137,28 +135,30 @@
             </figure>
         </div>
         <p>
-            The CAD models used to train and test MeshCNN belong to the ABC Dataset, which is a compilation of 1 million publicly available
-            models extracted from Onshape <b>TODO REF</b>. Each model is made of explicitely parameterized surfaces and curves, and it's defined as a Boundary
+            The CAD models used to train and test MeshCNN belong to the ABC Dataset, a compilation of 1 million publicly available
+            models extracted from <a href="https://www.onshape.com/en/">Onshape</a>. Each model is made of explicitely parameterized surfaces and curves, and it's defined as a Boundary
             representation in STEP and Parasolid formats. The dataset comes together with a processing pipeline to generate meshes with high quality
-            triangulation in OBJ format as well as surface and curve labels for vertices and faces in YAML. We've only used the OBJ meshes provided
-            in the dataset for our initial experiments, remeshing the models with a lower resultion at a later stage using ABC processing tools in
-            order to reduce MeshCNN training times.
+            triangulation in OBJ format as well as surface and curve labels for vertices and faces in YAML. We only use the OBJ meshes provided
+            in the dataset for our initial experiments, remeshing the models with a lower resultion at a later stage using ABC processing tools.
         </p>
         <div style="clear:both;display: block"/>
     </div>
 
     <div class="docs-section" id="method">
         <h3 class="section-heading">Method</h3>
-        <p class="section-description"> The methodology followed to evaluate MeshCNN's performance on surface type segmentation for CAD models was iteratively refined through a set of initial experiments that helped us finding
-            MeshCNN limitations as well as the required ABC dataset preprocessing steps for the classification task at hand. Some of the identified MeshCNN limitations were addressed here, either changing MeshCNN implementation or circumventing them
-            through data preprocessing; others were listed for future work.
+        <p class="section-description"> The methodology followed to evaluate MeshCNN's performance on surface type segmentation for CAD models is iteratively refined through a set of initial experiments that help us finding
+            MeshCNN limitations as well as the required ABC dataset preprocessing steps for the classification task at hand. Some of the identified MeshCNN limitations are addressed here, either changing MeshCNN implementation or circumventing them
+            through data preprocessing; others are listed for future work.
         </p>
         <h4 class="subsection-heading">MeshCNN improvements</h4>
-        <p>Initial experiments showed that MeshCNN is not optimized to handle large meshes. The experiments in the
-           original paper use datasets with small meshes, having at most a few thousand edges.<br><br>
+        <p>Initial experiments show that MeshCNN is not optimized to handle large meshes. The experiments in the
+           original paper use datasets with small meshes, having at most a few thousand edges.
+        </p>
+        <p>
            The first bottleneck is GPU memory usage, which grows quadratically with the number of mesh edges. Each pooling
             layer keeps in memory a tensor of \(edges^{2}\) elements mapping edge collapses (<a href="https://github.com/ranahanocka/MeshCNN/blob/15b83cc6a4db968baf6cf595df78995a9c2dcee3/models/layers/mesh_union.py#L5"><i>MeshUnion</i></a> class).
-            This makes impossible training with half of the meshes in the ABC dataset (a single pooling operation in a 50K-edge mesh would allocate ~18GB of memory just for edge collapse bookkeeping!).<br>
+            This makes training with half of the meshes in the ABC dataset impossible (a single pooling operation in a 50K-edge mesh would allocate ~18GB of memory just for edge collapse bookkeeping!).
+        </p>
             \[
             U = \begin{bmatrix}
                 u_{11} & u_{12} & \dots \\
@@ -169,23 +169,26 @@
               N = \text{#output edges}\\
               u_{ij} = \text{# collapses of input edge i into output edge j}
             \end{cases}
-            \],<br>
-            The tensor though is inherently sparse, therefore we reimplemented <i>MeshUnion</i> and <a href="https://github.com/ranahanocka/MeshCNN/blob/15b83cc6a4db968baf6cf595df78995a9c2dcee3/models/layers/mesh_unpool.py#L6"><i>MeshUnpool</i></a> classes using <a href="https://pytorch.org/docs/stable/generated/torch.sparse_coo_tensor.html"><i>torch.sparse_coo_tensor</i></a>
+            \]
+        <p>
+            The tensor though is inherently sparse, therefore we reimplement <i>MeshUnion</i> and <a href="https://github.com/ranahanocka/MeshCNN/blob/15b83cc6a4db968baf6cf595df78995a9c2dcee3/models/layers/mesh_unpool.py#L6"><i>MeshUnpool</i></a> classes using <a href="https://pytorch.org/docs/stable/generated/torch.sparse_coo_tensor.html"><i>torch.sparse_coo_tensor</i></a>
             and sparse operations such as  <a href="https://pytorch.org/docs/stable/sparse.html#torch.sparse.mm"><i>torch.sparse.mm</i></a> and <a href="https://pytorch.org/docs/stable/sparse.html#torch.sparse.mm"><i>torch.sparse.sum</i></a>.
             The memory consumption at function <a href="https://github.com/ranahanocka/MeshCNN/blob/15b83cc6a4db968baf6cf595df78995a9c2dcee3/models/layers/mesh_conv.py#L39"><i>create_GeMM</i></a> in the <a href="https://github.com/ranahanocka/MeshCNN/blob/15b83cc6a4db968baf6cf595df78995a9c2dcee3/models/layers/mesh_conv.py#L5"><i>MeshConv</i></a>
-            layer was also reduced to less than a half by deleting temporary tensors once they're not needed and rewriting the symmetric functions so that they are done in place.<br><br>
+            layer was also reduced to less than a half by deleting temporary tensors once they're not needed and rewriting the symmetric functions so that they are done in place.
+        </p>
+        <p>
             Another important bottleneck is that the edge collapsing at the MeshPool layer is done sequentially in CPU. As a result, MeshCNN training is
             CPU-bound and GPU utilization is low (under 30% in a NVIDIA Tesla P100). Training times become impractical for small datasets
-            (9h per epoch for 1K meshes of 35K edges). To alleviate this problem, we modified MeshCNN code to allow for distributed training across multiple CPUs, GPUs and
+            (9h per epoch for 1K meshes of 35K edges). To alleviate this problem, we modify MeshCNN code to allow for distributed training across multiple CPUs, GPUs and
             even nodes. Using <a href="https://pytorch.org/docs/stable/generated/torch.nn.parallel.DistributedDataParallel.html"><i>torch.nn.parallel.DistributedDataParallel</i></a>, each batch
             is split and processed by identical instances of the model in separate devices, averaging the gradients for each node during the backwards pass.<br><br>
-            Thanks to these optimizations we could train MeshCNN with ABC models of average size (~35K edges) and typical batch sizes (~10), having still room to increase
+            Thanks to these optimizations we can train MeshCNN with ABC models of average size (~35K edges) and typical batch sizes (~10), having still room to increase
             the number of pooling layers.<br>
         </p>
         <h4 class="subsection-heading">Dataset preprocessing</h4>
-        <p>As first preprocessing step for the compilation of dataset, we detect and exclude non-manifold meshes, since they're not supported by MeshCNN.<br>
-           Additionally, small connected components (<10% of total faces) within a model are likely to become non-manifold during pooling. Models with such small
-           components had to be excluded with the original MeshCNN code. To overcome this problem, we've modified MeshCNN to skip edge collapses that would result
+        <p>As first preprocessing step for the compilation of dataset, we detect and exclude non-manifold meshes, since they're not supported by MeshCNN.
+           Additionally, small connected components (<10% of total number of faces) within a model are likely to become non-manifold during pooling. Models with such small
+           components must be excluded with the original MeshCNN code. To overcome this problem, we modify MeshCNN to skip edge collapses that would result
             in a non-manifold mesh.
         </p>
            <div class="row">
@@ -205,17 +208,17 @@
             </div>
         <h4 class="subsection-heading">Dataset remeshing</h4>
         <p> ABC models are published with meshes of very different sizes, ranging from 2000 edges and a few surface patches, up to 200 thousand edges and thousands of surfaces. However, MeshCNN relies on input
-            meshes having a similar number of edges. Larger meshes need to be pooled further and at more levels than smallers ones, since they need to capture features at more scales in order detect surface patches
-            of many sizes. Therefore a given MeshCNN parametrization (number of pooling layers and target sizes) that's optimal for meshes of some size will probably be inadequate for smaller meshes, or even impracticable if
-            those smaller meshes cannot be simplified to the specified target sizes.
+            meshes having a similar number of edges. Larger meshes need to be pooled further and at more levels than smallers ones, since they have features at more scales that need to be captured in order detect surface patches
+            of many sizes. Therefore a given MeshCNN parametrization (number of pooling layers and target sizes) may be optimal for some mesh size, but inadequate for smaller meshes, or even impracticable if
+            they cannot be simplified enough without breaking their manifold properties.
         </p>
         <p>
-            In our first experiments we used the meshes in OBJ format provided as part of ABC dataset, taking samples of a target number of edges with a small error margin (5%). Since ABC meshes have very high resolution,
+            In our first experiments we use the meshes in OBJ format provided as part of ABC dataset, taking samples of a target number of edges with a small error margin. Since ABC meshes have very high resolution,
             sampling meshes of the smallest sizes (5000 edges or fewer) results in very small datasets (3% of the whole ABC dataset) consisting of very simple models made of a few plane and cylindrical surfaces. To obtain subsets of
-            acceptable size and complexity, one has to sample meshes around 35000 edges in size (average size of ABC models). However, learning segmentation on larger meshes requires more complex models (more convolution and pooling stages),
-            which in turn need larger training sets to obtain the same generalization error than simpler ones. Thus, in order to have reasonable training times, we remeshed ABC models to a target size of 2000 edges (+/- 2% tolerance) using <i>cadmesh</i>, the
-            tool used to generate the original ABC meshes. We limited the meshing error with respect to the original CAD surfaces by setting curvature-dependent face size constraints (gmsh's <a href="https://gmsh.info/doc/texinfo/gmsh.html#index-Mesh_002eMeshSizeFromCurvature">MeshSizeFromCurvature</a>).
-            That way we obtained more than 10000 meshes out of the first 170000 ABC samples.
+            acceptable size and complexity, one has to sample meshes sizes near 35000 edges (average size of ABC models). However, learning segmentation on larger meshes requires more complex models (more convolution and pooling stages),
+            which in turn need larger training sets to obtain the same generalization error than simpler ones. Thus, in order to have reasonable training times, we remesh ABC models to a target size of 2000 edges (-2% error) using <i>cadmesh</i>, ABC's meshing
+            tool . We limit the meshing error with respect to the original CAD surfaces by setting curvature-dependent face size constraints (gmsh's <a href="https://gmsh.info/doc/texinfo/gmsh.html#index-Mesh_002eMeshSizeFromCurvature">MeshSizeFromCurvature</a>).
+            That way we obtain more than 10000 meshes out of the first 170000 ABC samples.
         </p>
         <h4 class="subsection-heading">Dataset augmentation</h4>
         <div class="u-pull-right" style="width:50%; margin-left:20px">
@@ -225,19 +228,20 @@
             </figure>
         </div>
         <p>Surfaces in ABC dataset models are predominantly planes and cylinders, with less than 10% of the surfaces belonging to other classes. This imbalance in the
-            surface class occurrence biases the model towards the overrepresented classes and impedes the learning of the underrepresented surface types.Experiments applying
-            a weighted loss function to penalize more misclassifications of the underrepresented classes showed no noticeable improvements.</p>
+            surface class occurrence biases the model towards the overrepresented classes and impedes the learning of the underrepresented surface types.</p>
         <p>
-            The class imbalance was addressed by resampling. Any model made of exclusively of planes and cylinders was discarded, hence downsampling these classes. Additionally, synthetic samples were
-            created for the other classes to upsample them. The synthetic samples were created using <i>gmsh</i> <b>TODO: ADD REF</b> to mesh parametric surfaces with uniformly distributed random parameters.<br>
-            The first synthetic samples were open meshes made of a single surface, thus having a fine control in the class upsampling. This approach had multiple problems:
+            Given that experiments using weighted loss function to penalize more misclassifications of the underrepresented classes show no noticeable improvement, we address the class imbalance by resampling. Any model made exclusively of planes and cylinders is discarded, hence downsampling these surface types. Additionally, synthetic samples are
+            created for the other classes to upsample them. The synthetic samples were created using <a href="https://gmsh.info/">gmsh</a> to mesh parametric surfaces with uniformly distributed random parameters.
+        </p>
+        <p>
+            Although the generation of open meshes with a single surface seems the most straightforward option to have a fine control in the class upsampling, this approach presents multiple problems:
         </p>
         <ol>
-            <li>MeshCNN applies boundary-preserving edge collapses during pooling. As a result, the prediction accuracy near the mesh boundary is severely affected</li>
+            <li>MeshCNN applies boundary-preserving edge collapses during pooling. As a result, the prediction accuracy near the mesh boundary is severely affected (see <a href="#open-mesh">example</a> below)</li>
             <li>Samples are too simplistic, the classifier cannot learn to identify class boundaries with synthetic samples made of a single surface.</li>
             <li>Most ABC models are closed meshes.</li>
         </ol>
-        <div class="row">
+        <div class="row" id="open-mesh">
             <div class="one-half column category">
                 <h5 style="text-align:center">Open cone prediction (original size)</h5>
 
@@ -271,7 +275,7 @@
         </div>
 
         <p>
-            Thefore, the final synthetic dataset was composed of closed meshes made of multiple surface types, much more similar to (albeit still simpler than) ABC models, but at expense of losing the fine-grained control of over
+            Thefore we opt for augmenting our datasets with closed meshes made of multiple surface types, much more similar to (albeit still simpler than) ABC models, at expense of losing the fine-grained control over
             the class occurrence in the augmented dataset.
         </p>
 
@@ -404,8 +408,8 @@
             </table>
         </div>
     <h4 class="subsection-heading">Regularization</h4>
-    <p>To reduce overfitting we've used <a href="https://pytorch.org/docs/stable/_modules/torch/optim/adamw.html#AdamW"><i>AdamW</i></a> optimizer,
-        a version of Adam that includes decoupled weight decay regularization <a href="#3">[3]</a>:
+    <p>To reduce overfitting we use <a href="https://pytorch.org/docs/stable/_modules/torch/optim/adamw.html#AdamW"><i>AdamW</i></a> optimizer,
+        a version of Adam that includes decoupled weight decay regularization <a href="#AdamW">[7]</a>:
         \[
             \boldsymbol{\theta_{t}} \leftarrow \boldsymbol{\theta_{t-1}} - \eta_{t}\left( \frac{\alpha \boldsymbol{\hat{m}_{t}}}{\sqrt{\boldsymbol{\hat{v}}_{t}}+\epsilon} + \lambda \boldsymbol{\theta_{t-1}}\right)
         \]
@@ -454,7 +458,7 @@
                             </tr>
                     </table>
                 </div>
-                <p>In this first experiment we trained MeshCNN with a toy ABC subset of size and mesh resolutions similar to those
+                <p>In this first experiment we train MeshCNN with a toy ABC subset of size and mesh resolutions similar to those
                     used in <a href="#1">[1]</a>, with the following objectives:
                 </p>
                 <ul>
@@ -462,8 +466,8 @@
                     <li>Identify potential changes required in MeshCNN and dataset preprocessing.</li>
                     <li>Verify the feasibility of using MeshCNN for surface class segmentation on ABC models.</li>
                 </ul>
-                <p>As a result of the experiment, we identified the memory and processing bottlenecks as well as required preprocessing steps
-                explained in the <a href="#method">methodology</a>.</p>.
+                <p>As a result of the experiment, we identify the memory and processing bottlenecks as well as required preprocessing steps
+                covered in the <a href="#method">methodology</a>.</p>.
             </div>
             <div style="clear:both;display: block"/>
         </div>
@@ -505,9 +509,11 @@
                             </tr>
                     </table>
             </div>
-            <p>Onced the issues observed in the first experiment were solved, we compiled a larger dataset with meshes of
-                sizes close to the ABC average. We constrained the size difference (in edge count) among meshes in this dataset to be at most 10%, since
-                training with meshes of very different sizes could potentially affect the classifier performance as it does to CNNs for images.<br>
+            <p>In this next experiment we compile a larger dataset with meshes of
+                sizes close to the ABC average. We constrain the size difference (in edge count) among meshes in this dataset to be at most 10%, since
+                training with meshes of very different sizes could potentially affect the classifier performance as explained in the <a href="#method">methodology</a>.
+            </p>
+            <p>
                 The model learns to predict the two most frequent classes (plane and cylinder surfaces), but not the rest. The optimization seems to stay at a local minima in the loss
                 function, most probably due to the imbalance in the class occurrence.
             </p>
@@ -763,11 +769,11 @@
 
     <div class="docs-section" id="discussion">
         <h3 class="section-heading">Discussion and Future Work</h3>
-        <p>In this project we've evaluated the performance of MeshCNN predicting mesh segmentation by surface type in CAD models from ABC dataset. The outcome of the experiments helped us identify multiple
+        <p>In this project we evaluate the performance of MeshCNN predicting mesh segmentation by surface type in CAD models from ABC dataset. The outcome of the experiments helps us identify multiple
         root causes for the poor accuracy exhibited by the tested models, some intrinsic to the classification task at hand, others related to architectural and implementation shortcomings in MeshCNN.</p>
         <h4 class="subsection-heading">CAD surface type imbalance and overlapping</h4>
         <p>We've already established that the problem of segmenting ABC meshes by surface type suffers from class imbalance. More than 90% of the surfaces in ABC models are plane and cylinders, an imbalance that
-        can probably be extrapolated to CAD models in general. But research <b>TODO: ADD REFS</b> indicates that it's class overlapping, a phenomenon highly correlated to class imbalance, what has a greater
+            can probably be extrapolated to CAD models in general. <a href="#ImbalancedData">[Prati 2004]</a> supports the view that it's class overlapping, a phenomenon highly correlated to class imbalance, what has a greater
         impact on classification performace. Certainly, surface classes have overlaps, where some surfaces types are a subset of more general ones:</p>
         <ul>
             <li>Cylinder, Cone, Torus, Sphere \( \subset \) Revolution</li>
@@ -881,10 +887,10 @@
         </div>
         <h4 class="subsection-heading">MeshCNN CPU and memory performance bottlenecks</h4>
         <p>MeshCNN implementation of mesh pooling suffers from memory and CPU bottlenecks. We've greatly reduced the memory consumption during pooling by using sparse matrices for
-        edge collapse bookeping. Additionally, to achieve faster training times, we've also modified MeshCNN to use Pytorch's distributed training. However, MeshCNN remains essentially CPU-bound, and the speedup offered by
+        edge collapse bookeping. Additionally, to achieve faster training times, we also modify MeshCNN to use Pytorch's distributed training. However, MeshCNN remains essentially CPU-bound, and the speedup offered by
         distributed training is limited by inter-node communication penalities. Fine-grained GPU parallelization in contrast scales better with sample and batch size and it's one of main reasons deep learning has achieved great
         results in the last decade.<br>
-        There's multiple research papers on GPU-parallelized mesh simplification algorithms, some of which use edge collapses <a href="#4">[4]</a> <a href="#5">[5]</a> and could be therefore implemented
+        There's multiple research papers on GPU-parallelized mesh simplification algorithms, some of which use edge collapses <a href="#9">[9]</a> <a href="#10">[10]</a> and could be therefore implemented
         in MeshCNN. A full in-GPU MeshCNN implementation would reduce training times considerably, accelerating training with more agressive data augmentation techniques (remeshing, vertex perturbation) that can potentially improve
         the generalization error.
         </p>
@@ -949,8 +955,8 @@
         <ul>
             <li>Presentations
               <ol>
-                <li>Project proposal</li>
-                <li>Tech presentation</li>
+                  <li><a href="https://docs.google.com/presentation/d/1-K0hf9JYIPFwO8L-2Rox58NqX2HDCajw3IaxhPiaHOk/edit?usp=sharing">Project proposal</a></li>
+                  <li><a href="https://docs.google.com/presentation/d/1DjpKCU1hthZapswND79o_irvbwrN1wlzatTyI40-PEk/edit?usp=sharing">Tech presentation</a></li>
               </ol>
             </li>
         </ul>
@@ -959,27 +965,42 @@
     <div class="docs-section" id="references">
         <h3 class="section-heading">References</h3>
         <ul class="popover-list">
-            <li class="popover-item" id="1">
+            <li class="popover-item" id="MeshCNN">
                 <!--A link to this may look like: <a href="#1">[1]</a>-->
                 [1] Rana Hanocka, Amir Hertz, Noa Fish, Raja Giryes, Shachar Fleishman and Daniel Cohen-Or. 2019. MeshCNN: A Network with an Edge. <i>ACM Trans. Graph. 1, 1 (Feb 2019). </i><a href="https://ranahanocka.github.io/MeshCNN"> https://ranahanocka.github.io/MeshCNN</a>
             </li>
-          
-            <li class="popover-item" id="2">
-                [2] Koch, Sebastian and Matveev, Albert and Jiang, Zhongshi and Williams, Francis and Artemov, Alexey and Burnaev, Evgeny and Alexa, Marc and Zorin, Denis and Panozzo, Daniele. 2019. ABC: A Big CAD Model Dataset For Geometric Deep Learning. <i>The IEEE Conference on Computer Vision and Pattern Recognition (CVPR) (June 2019). </i><a href="https://deep-geometry.github.io/abc-dataset"> https://deep-geometry.github.io/abc-dataset</a>
+          <li class="popover-item" id="Su15">
+              [2] Hang Su, Subhransu Maji, Evangelos Kalogerakis, and Erik Learned-Millers. 2015. Multi-view Convolutional Neural Networks for 3D Shape Recognition. In <i>International Conference on Computer Vision (ICCV)</i>.
+          </li>
+            <li class="popover-item" id="Wu15">
+             [3] Zhirong Wu, Shuran Song, Aditya Khosla, Fisher Yu, Linguang Zhang, Xiaoou Tang, and Jianxiong Xiao. 2015. 3D shapenets: A deep representation for volumetric shapes. In <i>Computer Vision and Pattern Recognition (CVPR)</i>.
+            </li>
+            <li class="popover-item" id="ABC">
+                [4] Koch, Sebastian and Matveev, Albert and Jiang, Zhongshi and Williams, Francis and Artemov, Alexey and Burnaev, Evgeny and Alexa, Marc and Zorin, Denis and Panozzo, Daniele. 2019. ABC: A Big CAD Model Dataset For Geometric Deep Learning. <i>The IEEE Conference on Computer Vision and Pattern Recognition (CVPR) (June 2019). </i><a href="https://deep-geometry.github.io/abc-dataset"> https://deep-geometry.github.io/abc-dataset</a>
+            </li>
+            <li class="popover-item" id="UNet">
+                [5] Olaf Ronneberger, Philipp Fischer, & Thomas Brox. (2015). U-Net: Convolutional Networks for Biomedical Image Segmentation.
+            </li>
+            <li class="popover-item" id="ResUNet">
+                [6] Diakogiannis, F., Waldner, F., Caccetta, P., & Wu, C. (2020). ResUNet-a: A deep learning framework for semantic segmentation of remotely sensed data. <i>ISPRS Journal of Photogrammetry and Remote Sensing, 162, 94–114</i>.
+            </li>
+            <li class="popover-item" id="AdamW">
+                [7] Ilya Loshchilov, Frank Hutter. 2019. Decoupled Weight Decay Regularization. ICLR 2019.
+            </li>
+            <li class="popover-item" id="ImbalancedData">
+                [8] Prati, M. (2004). Class Imbalances versus Class Overlapping: An Analysis of a Learning System Behavior. In <i>MICAI 2004: Advances in Artificial Intelligence (pp. 312–321). Springer Berlin Heidelberg.</i>
+            </li>
+            <li class="popover-item" id="9">
+                [9] Alexandros Papageorgiou,Nikos Platis. 2015. Triangular mesh simplification on the GPU. The Visual Computer 31.
             </li>
 
-            <li class="popover-item" id="3">
-                [3] Ilya Loshchilov, Frank Hutter. 2019. Decoupled Weight Decay Regularization. ICLR 2019.
+             <li class="popover-item" id="10">
+                [10] Odaker, Thomas; Kranzlmüller, Dieter; Volkert, Jens (2016): GPU-Accelerated Real-Time Mesh Simplification Using Parallel Half Edge Collapses.
             </li>
 
-            <li class="popover-item" id="4">
-                [4] Alexandros Papageorgiou,Nikos Platis. 2015. Triangular mesh simplification on the GPU. The Visual Computer 31.
+            <li class="popover-item" id="MeshPlot">
+                All interactive meshes in this page are rendered using <a href="https://skoch9.github.io/meshplot/">Meshplot</a>
             </li>
-
-             <li class="popover-item" id="5">
-                [5] Odaker, Thomas; Kranzlmüller, Dieter; Volkert, Jens (2016): GPU-Accelerated Real-Time Mesh Simplification Using Parallel Half Edge Collapses.
-            </li>
-            
         </ul>
     </div>
 
