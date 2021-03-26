@@ -25,6 +25,9 @@
                     <a class="navbar-link" href="#intro">Intro</a>
                 </li>
                 <li class="navbar-item">
+                    <a class="navbar-link" href="#implementation">Implementation</a>
+                </li>
+                <li class="navbar-item">
                     <a class="navbar-link" href="#method">Method</a>
                 </li>
                 <li class="navbar-item">
@@ -55,7 +58,7 @@
                     <p  style="text-align: justify;">There's been multiple approaches trying to extrapolate convolutional neural networks
                         to irregular 3D data. MeshCNN<a href="#MeshCNN">[1]</a> is an innovative framework to build classifiers
                         out of convolution and pooling operations designed specifically to work with edge features in 3D meshes. In this project,
-                        we evaluate the performance of MeshCNN segmenting meshes of CAD models into their constituent surface types.</p>
+                        we improve MeshCNN to support large realistic CAD models and evaluate its performance segmenting these models into their constituent surface types.</p>
         </div>
     </section>
 
@@ -63,31 +66,22 @@
         <h3 class="section-heading">Introduction</h3>
         <p>
             CNNs have been successfully applied for classification and segmentation of regular data such as images, natural language or time series.
-        Their use on irregular 3D data such as point clouds or meshes is however not straightforward,
-        since convolution and pooling operations are only defined for data that's uniformly distributed across dimensions. In contrast to previous attempts <a href="#Su15">[2]</a><a href="#Wu15">[3]</a>
+            However, the convolution and pooling operations performed by classical CNNs are not directly applicable to irregularly sampled data, such as
+            3D point clouds and meshes. In contrast to previous attempts <a href="#Su15">[2]</a><a href="#Wu15">[3]</a>
         to workaround this limitation by transforming 3D data into regular representations, MeshCNN redefines convolution and pooling
         operations so that they're directly applicable to mesh edges. MeshCNN counts with two different architectures built out of these primitives: a mesh classifier,
         with a typical design of stacked convolution and pooling layers ending up in a fully connected part; and a fully-convolutional ResUnet
         architecture for class segmentation.
         </p>
         <p>
-            In this project we measure MeshCNN performance in a class segmentation problem, where the goal is to predict the segmentation of CAD model meshes
-            into explictely parameterized surfaces. The CAD models used are a subset of the 1 million samples available in ABC Dataset<a href="#ABC">[4]</a>. As a result of
+            In this project we first modify MeshCNN to overcome memory and CPU bottlenecks that make learning on large meshes (more than a few thousand edges) inviable with the original implementation.
+            Then we use our improved version to measure MeshCNN performance in a class segmentation problem, where the goal is to predict the segmentation of realistic CAD model meshes
+            into explictely parameterized surfaces. The CAD models used are a subset of the 1 million samples available in ABC Dataset<a href="#ABC">[4]</a>. We modify MeshCNN implementation
+            As a result of
             this exercise we identify shortcomings in MeshCNN design and implementation, solving some of them and leaving others for <a href="#discussion">future work</a>. Additionally, the outcome of our
             experiments provides some insight into the issues that may be found on surface class segmentation tasks for CAD models.
         </p>
-        <h4 class="subsection-heading">MeshCNN's ResUNet for class segmentation</h4>
-        <p>
-            UNet is a fully-convolutional neural network architecture originally designed for medical image segmentation <a href="#UNet">[5]</a>. It's characterized by a
-            contractive path or encoder, where feature maps are convolved and pooled into progressively smaller resolutions (and hence larger receptive fields); followed by
-            and expansive path or decoder, where the encoded features are gradually unpooled to their original resolution. Another hallmark of the UNet architecture are the so called
-            "skip connections", with which the network convolves together feature maps of same resolution coming from the contractive and expansive paths. ResUNets <a href="#ResUNet">[6]</a> add residual blocks
-            to the UNet design in order to facilitate learning of linear mappings in deep neural networks.
-        </p>
-         <figure>
-            <img class="u-max-full-width" src="images/MeshCNN.svg">
-            <figcaption>MeshCNN ResUNet</figcaption>
-        </figure>
+        <h4 class="subsection-heading">MeshCNN architecture</h4>
         <div>
              <div class="u-pull-right" style="width:20%">
                 <figure>
@@ -99,7 +93,7 @@
                     <figcaption>Mesh Convolution<a href="#MeshCNN">[1]</a></figcaption>
                 </figure>
             </div>
-           <p>MeshCNN uses mesh edges as primitives. For each edge, it computes 5 input features:
+           <p>MeshCNN defines a set of operations where mesh edges are the primitives. Each edge has 5 input features:
             </p>
             <img style="display:block;margin:auto" width="50%" src="images/input_vector.svg">
              <ul>
@@ -124,6 +118,17 @@
                 <figcaption>Mesh Pooling/Unpooling<a href="#MeshCNN">[1]</a></figcaption>
             </figure>
         </div>
+        <p> Out of these mesh operations, MeshCNN builts a ResUNet model designed to learn segmentation of mesh edges into classes.
+            UNet is a fully-convolutional neural network architecture originally designed for medical image segmentation <a href="#UNet">[5]</a>. It's characterized by a
+            contractive path or encoder, where feature maps are convolved and pooled into progressively smaller resolutions (and hence larger receptive fields); followed by
+            and expansive path or decoder, where the encoded features are gradually unpooled to their original resolution. Another hallmark of the UNet architecture are the so called
+            "skip connections", with which the network convolves together feature maps of same resolution coming from the contractive and expansive paths. ResUNets <a href="#ResUNet">[6]</a> add residual blocks
+            to the UNet design in order to facilitate learning of linear mappings in deep neural networks.
+        </p>
+         <figure>
+            <img class="u-max-full-width" src="images/MeshCNN.svg">
+            <figcaption>MeshCNN ResUNet</figcaption>
+        </figure>
         <h4 class="subsection-heading">ABC Dataset</h4>
         <div class="u-pull-right" style="width:30%">
             <figure>
@@ -141,15 +146,12 @@
         <div style="clear:both;display: block"/>
     </div>
 
-    <div class="docs-section" id="method">
-        <h3 class="section-heading">Method</h3>
-        <p class="section-description"> The methodology followed to evaluate MeshCNN's performance on surface type segmentation for CAD models is iteratively refined through a set of initial experiments that help us finding
-            MeshCNN limitations as well as the required ABC dataset preprocessing steps for the classification task at hand. Some of the identified MeshCNN limitations are addressed here, either changing MeshCNN implementation or circumventing them
-            through data preprocessing; others are listed for future work.
-        </p>
-        <h4 class="subsection-heading">MeshCNN improvements</h4>
-        <p>Initial experiments show that MeshCNN is not optimized to handle large meshes. The experiments in the
-           original paper use datasets with small meshes, having at most a few thousand edges.
+    <div class="docs-section" id="implementation">
+       <h3 class="section-heading">MeshCNN improvements</h3>
+        <p class="section-description">In its original publication <a href="#MeshCNN">[1]</a>, MeshCNN is validated using very small synthetic datasets (fewer than 1000 samples) made of relatively small meshes (2250 edges at most).
+            By contrast, we aim to learn segmentation on a much larger dataset (up to 1 million samples) made of large CAD models (up to 200K edges) compiled from real use cases. Our initial experiments expose some limitations in the original
+            MeshCNN implementation that make it incapable of handling these kind of workloads. As part of this project we address some of the identified limitations in the implementation. Others are circumvented through data preprocessing and
+            listed for future work.
         </p>
         <p>
            The first bottleneck is GPU memory usage, which grows quadratically with the number of mesh edges. Each pooling
@@ -178,9 +180,17 @@
             CPU-bound and GPU utilization is low (under 30% in a NVIDIA Tesla P100). Training times become impractical for small datasets
             (9h per epoch for 1K meshes of 35K edges). To alleviate this problem, we modify MeshCNN code to allow for distributed training across multiple CPUs, GPUs and
             even nodes. Using <a href="https://pytorch.org/docs/stable/generated/torch.nn.parallel.DistributedDataParallel.html"><i>torch.nn.parallel.DistributedDataParallel</i></a>, each batch
-            is split and processed by identical instances of the model in separate devices, averaging the gradients for each node during the backwards pass.<br><br>
+            is split and processed by identical instances of the model in separate devices, averaging the gradients for each node during the backwards pass.
+        </p>
+        <p>
             Thanks to these optimizations we can train MeshCNN with ABC models of average size (~35K edges) and typical batch sizes (~10), having still room to increase
-            the number of pooling layers.<br>
+            the number of pooling layers.
+        </p>
+    </div>
+    <div class="docs-section" id="method">
+        <h3 class="section-heading">Method</h3>
+        <p class="section-description"> The methodology followed to evaluate MeshCNN's performance on surface type segmentation for CAD models is iteratively refined through a set of initial experiments that help us finding
+            MeshCNN limitations as well as the required ABC dataset preprocessing steps for the classification task at hand.
         </p>
         <h4 class="subsection-heading">Dataset preprocessing</h4>
         <p>As first preprocessing step for the compilation of dataset, we detect and exclude non-manifold meshes, since they're not supported by MeshCNN.
@@ -217,7 +227,7 @@
             tool . We limit the meshing error with respect to the original CAD surfaces by setting curvature-dependent face size constraints (gmsh's <a href="https://gmsh.info/doc/texinfo/gmsh.html#index-Mesh_002eMeshSizeFromCurvature">MeshSizeFromCurvature</a>).
             That way we obtain more than 10000 meshes out of the first 170000 ABC samples.
         </p>
-        <h4 class="subsection-heading">Dataset augmentation</h4>
+        <h4 class="subsection-heading">Dataset augmentation and regularization</h4>
         <div class="u-pull-right" style="width:50%; margin-left:20px">
             <figure>
                 <img class="u-max-full-width" src="images/class_imbalance_chart.svg">
@@ -404,7 +414,6 @@
                 </tbody>
             </table>
         </div>
-    <h4 class="subsection-heading">Regularization</h4>
     <p>To reduce overfitting we use <a href="https://pytorch.org/docs/stable/_modules/torch/optim/adamw.html#AdamW"><i>AdamW</i></a> optimizer,
         a version of Adam that includes decoupled weight decay regularization <a href="#AdamW">[7]</a>:
         \[
@@ -768,7 +777,7 @@
     <div class="docs-section" id="discussion">
         <h3 class="section-heading">Discussion and Future Work</h3>
         <p>In this project we evaluate the performance of MeshCNN predicting mesh segmentation by surface type in CAD models from ABC dataset. The outcome of the experiments helps us identify multiple
-        root causes for the poor accuracy exhibited by the tested models, some intrinsic to the classification task at hand, others related to architectural and implementation shortcomings in MeshCNN.</p>
+        root causes for the poor accuracy exhibited by the tested models, some intrinsic to the input data, others related to architectural and implementation shortcomings in MeshCNN.</p>
         <h4 class="subsection-heading">CAD surface type imbalance and overlapping</h4>
         <p>We've already established that the problem of segmenting ABC meshes by surface type suffers from class imbalance. More than 90% of the surfaces in ABC models are plane and cylinders, an imbalance that
             can probably be extrapolated to CAD models in general. <a href="#ImbalancedData">[Prati 2004]</a> supports the view that it's class overlapping, a phenomenon highly correlated to class imbalance, what has a greater
@@ -883,28 +892,23 @@
                 </tbody>
         </table>
         </div>
-        <h4 class="subsection-heading">MeshCNN CPU and memory performance bottlenecks</h4>
+        <h4 class="subsection-heading">MeshCNN limitations</h4>
         <p>MeshCNN implementation of mesh pooling suffers from memory and CPU bottlenecks. We've greatly reduced the memory consumption during pooling by using sparse matrices for
         edge collapse bookeping. Additionally, to achieve faster training times, we also modify MeshCNN to use Pytorch's distributed training. However, MeshCNN remains essentially CPU-bound, and the speedup offered by
         distributed training is limited by inter-node communication penalities. Fine-grained GPU parallelization in contrast scales better with sample and batch size and it's one of main reasons deep learning has achieved great
-        results in the last decade.<br>
-        There's multiple research papers on GPU-parallelized mesh simplification algorithms, some of which use edge collapses <a href="#9">[9]</a> <a href="#10">[10]</a> and could be therefore implemented
+        results in the last decade. There's multiple research papers on GPU-parallelized mesh simplification algorithms, some of which use edge collapses <a href="#9">[9]</a> <a href="#10">[10]</a> and could be therefore implemented
         in MeshCNN. A full in-GPU MeshCNN implementation would reduce training times considerably, accelerating training with more agressive data augmentation techniques (remeshing, vertex perturbation) that can potentially improve
         the generalization error.
         </p>
-        <h4 class="subsection-heading">Mesh pooling limitations</h4>
         <p>
-            The core concept behind MeshCNN is to extrapolate the convolution and pooling operations powering CNNs to 3D meshes. However MeshCNN's edge-oriented pooling exhibits some limitations that its pixel-based counterpart
-            does not have.
-        </p>
-        <p>
-            MeshCNN mesh pooling is implemented using boundary-preserving edge collapsing, and thus edges in the 1-ring neighbourhoods at mesh boundaries are never collapsed. A reason behind this design choice may be that a mesh boundary
-            could have information relevant to the classification tasks (e.g. classification of open meshes representing polygons). However, we've shown how in segmentation tasks this policy cripples the edge classification accuracy near
-            boundaries. A potential future line of investigation could evaluate the impact of unconstrained edge collapsing on MeshCNN performance for segmentation tasks on open meshes.
+            Other limitations reside in the core concept behind MeshCNN: the extrapolation of the convolution and pooling operations powering CNNs to 3D meshes. MeshCNN's edge-oriented pooling exhibits some problems that its pixel-based counterpart
+            does not have. One of these limitations, which affects exclusively open meshes, is that MeshCNN mesh pooling uses boundary-preserving edge collapsing, and thus edges in the 1-ring neighbourhoods at mesh boundaries are never collapsed.
+            A reason behind this design choice may be that a mesh boundary could have information relevant to the classification tasks (e.g. classification of open meshes representing polygons). However, we've shown how in segmentation tasks this policy cripples
+            the edge classification accuracy near boundaries. A potential future line of investigation could evaluate the impact of unconstrained edge collapsing on MeshCNN performance for segmentation tasks on open meshes.
         </p>
         <p>
             A more general limitation in mesh pooling is that the target mesh size may only be achieved if the necessary amount of edge collapses can be performed without breaking the mesh manifold. Image pooling on the contrary doesn't have
-            any limit, and in fact images are typically pooled down to much smaller sizes (e.g. 10% of the original size) in order to learn global features. For meshes the minimum achievable pooling size varies between samples, but lies around
+            any limit, and in fact images are typically pooled down to much smaller sizes (e.g. 10% of the original size) in order to learn global features. For meshes, the minimum achievable pooling size varies between samples, but lies around
             40% of the original size for ABC dataset models. This means that mesh features at the global scale cannot be learned by MeshCNN, since they're never pooled down enough to fit in the CNN receptive field (i.e. the convolution filter size).
             While some surfaces classes may be identifiable out of local features such as local curvature (e.g. sphere, cylinder, cone, torus), more general surface types, like revolution and extrusion, may only be characterized by global properties
             (e.g. axial symmetry in revolution surfaces). This inability to learn global features may be further exacerbated by MeshCNN adaptive edge collapsing policy, by which pooling happens non-uniformly across the mesh, thus increasing the chances that
