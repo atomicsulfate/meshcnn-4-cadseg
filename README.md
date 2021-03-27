@@ -50,8 +50,13 @@ Some segmentation result examples:
 
 Note, you can also get pre-trained weights using bash ```./scripts/seg/get_pretrained.sh```. 
 
-### Additional Datasets
-The same scripts also exist for a synthetic dataset. 
-
-# More Info
-Check out the [website](http://cybertron.cg.tu-berlin.de/p/cgp-ws20/meshcnn) for more details.
+# Project structure
+- **development**
+    * **meshcnn:** Original meshcnn code (unchanged).
+    * **data, models:** meshcnn extensions (e.g. sparse pooling, distributed training). 
+    * **test.py, train.py:** Test and train scripts.
+    * **scripts**
+        + **prepro:** Scripts for data preprocessing, synthetic sample generation, mesh visualization...
+        + **seg:** Scripts to execute basic workflow: train,test,view results.
+- **documentation**
+    * **[website](http://cybertron.cg.tu-berlin.de/p/cgp-ws20/meshcnn)**
