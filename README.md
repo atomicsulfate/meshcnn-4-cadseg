@@ -12,12 +12,15 @@ Tutor [Maximilian Kohlbrenner](mailto:kohlbrenner@tu-berlin.de)
 ### Installation
 - Clone this repo:
 ```bash
-git clone https://gitlab.cg.tu-berlin.de/sempro/cgp-ws20-meshcnn.git
+git clone git@gitlab.cg.tu-berlin.de:sempro/cgp-ws20-meshcnn.git
 cd cgp-ws20-meshcnn
 ```
 - Install dependencies with conda (creates an environment called cgp-meshcnn-basic):
-`conda env create -f basic_environment.yml` 
-  
+```bash
+cd development
+conda env create -f basic_environment.yml
+```
+ 
 ### ABC Dataset surface class segmentation
 Download the dataset
 ```bash
@@ -43,7 +46,7 @@ bash ./scripts/seg/view.sh
 
 Some segmentation result examples:
 
-<img src="" height="150px"/> <img src=""/> <img src="" height="150px"/> 
+<img src="documentation/imgs/model1414.png" height="150px"/> <img src="documentation/imgs/model4780.png" height="150px"/> <img src="documentation/imgs/model25725.png" height="150px"/> <img src="documentation/imgs/model170737.png" height="150px"/>
 
 Note, you can also get pre-trained weights using bash ```./scripts/seg/get_pretrained.sh```. 
 
