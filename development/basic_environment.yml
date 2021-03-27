@@ -1,0 +1,25 @@
+name: cgp-meshcnn-basic
+channels:
+  - pytorch
+  - conda-forge
+  - defaults
+dependencies:
+  - cython=0.27.3=py36h1860423_0
+  - ipydatawidgets=4.1.0=pyh9f0ad1d_0
+  - ipython=5.8.0=py36_1
+  - ipython_genutils=0.2.0=py_1
+  - ipywidgets=7.5.1=pyh9f0ad1d_1
+  - jupyter_client=6.1.7=py_0
+  - jupyter_core=4.7.0=py36h5fab9bb_0
+  - jupyterlab_pygments=0.1.2=pyh9f0ad1d_0
+  - meshplot=0.4.0=pyh9f0ad1d_1
+  - notebook=6.1.5=py36h5fab9bb_0
+  - numpy=1.19.4=py36h8732dcd_1
+  - pip=20.2.4=py36h06a4308_0
+  - python=3.6.8=h0371630_0
+  - pythreejs=2.2.1=pyh9f0ad1d_0
+  - pytorch=1.7.0=py3.6_cuda10.1.243_cudnn7.6.3_0
+  - widgetsnbextension=3.5.1=py36h5fab9bb_4
+  - pip:
+    - pytest==5.1.1
+    - tensorboardx==2.1

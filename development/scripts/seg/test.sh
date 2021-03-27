@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
 ## run the training
-python train.py \
---dataroot datasets/abc_5K_rem2K \
---name abc_5K_rem2K \
+python test.py \
+--dataroot datasets/abc_10K_dataset \
+--name abc_10K_dataset \
 --arch meshunet \
 --dataset_mode segmentation \
 --ncf 32 64 128 256 512 \
@@ -13,4 +13,6 @@ python train.py \
 --lr 0.001 \
 --batch_size 10 \
 --num_aug 1 \
---continue_train
+--num_threads 0 \
+--export_folder meshes
+

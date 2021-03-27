@@ -2,18 +2,14 @@
 
 ## run the training
 python train.py \
---dataroot datasets/abc_dummy \
---name coseg_aliens \
+--dataroot datasets/abc_10K_dataset \
+--name abc_10K_dataset \
 --arch meshunet \
 --dataset_mode segmentation \
---fake_segdata \
---ncf 32 64 128 256 \
---ninput_edges 65000 \
---pool_res 32000 8000 1000 \
+--ncf 32 64 128 256 512 \
+--ninput_edges 2000 \
+--pool_res 1600 1280 1024 850 \
 --resblocks 3 \
 --lr 0.001 \
---batch_size 12 \
---num_aug 20 \
---slide_verts 0.2 \
-
-
+--batch_size 10 \
+--num_aug 1

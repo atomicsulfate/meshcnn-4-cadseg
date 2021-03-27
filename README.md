@@ -27,7 +27,7 @@ Download the dataset
 bash ./scripts/seg/get_10K_dataset.sh
 ```
 
-Run training (if using conda env first activate env e.g. ```source activate meshcnn```)
+Run training (if using conda env first activate env e.g. ```conda activate cgp-meshcnn-basic```)
 ```bash
 bash ./scripts/seg/train.sh
 ```
@@ -39,7 +39,7 @@ Run test and export the intermediate pooled meshes:
 bash ./scripts/seg/test.sh
 ```
 
-Visualize the network-learned edge collapses:
+Visualize the network-learned segmentation vs labels:
 ```bash
 bash ./scripts/seg/view.sh
 ```

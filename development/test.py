@@ -1,8 +1,11 @@
+import sys,os
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__),"meshcnn")))
+
 from meshcnn.options.test_options import TestOptions
 from data import DataLoader, DistributedDataLoader
 from models import create_model
 from meshcnn.util.writer import Writer
-import os
 import torch.distributed as dist
 import torch.multiprocessing as mp
 
