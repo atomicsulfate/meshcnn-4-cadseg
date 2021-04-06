@@ -1,6 +1,0 @@
-- AdamW decoupled weight decay regularization
-	-> Other specialized regularization for image segmentation (spatial regularization): see A Regularized Convolutional Neural Network for Semantic Image Segmentation
-	
-- Accuracy loss in open meshes due to boundary preserving edge-collapsing. Handling of borders as in image CNN?
-
-- Ambiguity: (cylinder can also be extrusion, revolution...). Show 2nd guess accuracy.
